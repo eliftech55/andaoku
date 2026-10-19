@@ -75,6 +75,12 @@ export default function UserDashboardPage() {
   const latestResult = assessmentResults.length > 0 ? assessmentResults[0] : null;
   const completedModulesCount = progressList.filter((p) => p.status === "completed").length;
   const totalActivitiesCount = readingSessions.length;
+  const displayName =
+    profile?.displayName?.trim() ||
+    user?.displayName?.trim() ||
+    user?.email?.split("@")[0] ||
+    "Okur";
+  const firstName = displayName.split(/\s+/)[0];
 
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8 max-w-7xl">
@@ -87,7 +93,7 @@ export default function UserDashboardPage() {
             <span className="text-xs text-sage-300 capitalize">{profile?.educationLevel || "Ortaokul"} Kademesi</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold font-serif">
-            Hoş Geldiniz, {profile?.displayName || "Değerli Okur"}!
+            Hoş geldin, {firstName}!
           </h1>
           <p className="text-xs sm:text-sm text-sage-200">
             Bugün hedefinize ulaşmak için 1 okuma seansı ve 1 görsel dikkat çalışması tamamlayın.
