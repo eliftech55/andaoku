@@ -89,10 +89,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, pass: string) => {
     setLoading(true);
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("andaoku_demo_profile");
+    }
+    setProfile(null);
     const { user: loggedInUser, profile: loadedProfile, error } = await signInUser(email, pass);
     setLoading(false);
-    if (error) {
-      return { success: false, error };
+    if (error || !loggedInUser) {
+      setUser(null);
+      return { success: false, error: error || "Firebase oturumu doğrulanamadı." };
     }
     setUser(loggedInUser);
     setProfile(loadedProfile);
@@ -115,8 +120,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       role
     );
     setLoading(false);
-    if (error) {
-      return { success: false, error };
+    if (error || !newUser) {
+      setUser(null);
+      setProfile(null);
+      return { success: false, error: error || "Firebase hesabı oluşturulamadı." };
     }
     setUser(newUser);
     setProfile(newProfile);

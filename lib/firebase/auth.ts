@@ -8,7 +8,7 @@ import {
   User,
 } from "firebase/auth";
 import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
-import { auth, db } from "./client";
+import { auth, db, isFirebaseConfigured } from "./client";
 import { UserProfile, UserRole, EducationLevel, UserPreferences } from "../types";
 
 const defaultPreferences: UserPreferences = {
@@ -20,47 +20,64 @@ const defaultPreferences: UserPreferences = {
   soundEnabled: true,
 };
 
+function getAuthErrorMessage(error: unknown, action: "login" | "signup" | "reset") {
+  const code =
+    typeof error === "object" && error !== null && "code" in error
+      ? String(error.code)
+      : "";
+
+  if (code === "auth/api-key-not-valid") {
+    return "Firebase yapılandırması geçersiz. Vercel ortam değişkenlerini kontrol edip yeniden dağıtım yapın.";
+  }
+  if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
+    return "E-posta adresi veya parola yanlış.";
+  }
+  if (code === "auth/email-already-in-use") {
+    return "Bu e-posta adresiyle zaten bir hesap oluşturulmuş.";
+  }
+  if (code === "auth/invalid-email") {
+    return "Geçerli bir e-posta adresi girin.";
+  }
+  if (code === "auth/weak-password") {
+    return "Parola en az 6 karakter olmalıdır.";
+  }
+  if (code === "auth/operation-not-allowed") {
+    return "Firebase Console'da e-posta ve parola ile giriş yöntemini etkinleştirin.";
+  }
+  if (code === "auth/too-many-requests") {
+    return "Çok fazla deneme yapıldı. Bir süre bekleyip tekrar deneyin.";
+  }
+
+  const message =
+    typeof error === "object" && error !== null && "message" in error
+      ? String(error.message)
+      : "";
+  if (message) return message;
+
+  if (action === "login") return "Giriş yapılamadı. Lütfen tekrar deneyin.";
+  if (action === "signup") return "Kayıt oluşturulamadı. Lütfen tekrar deneyin.";
+  return "Parola sıfırlama e-postası gönderilemedi.";
+}
+
 /**
  * Kullanıcı Girişi
  */
 export async function signInUser(email: string, pass: string) {
+  if (!isFirebaseConfigured) {
+    return {
+      user: null,
+      profile: null,
+      error: "Firebase yapılandırması eksik. Vercel'de NEXT_PUBLIC_FIREBASE_ değişkenlerini tanımlayıp yeniden dağıtım yapın.",
+    };
+  }
+
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, pass);
     const user = userCredential.user;
     const profile = await getUserProfile(user.uid);
     return { user, profile, error: null };
-  } catch (error: any) {
-    const isApiKeyError =
-      error?.code === "auth/api-key-not-valid" ||
-      error?.message?.includes("api-key-not-valid") ||
-      error?.message?.includes("API key");
-
-    // Firebase anahtarı henüz girilmemişse yerel geliştirme profiliyle oturum açma desteği
-    if (isApiKeyError) {
-      console.warn(
-        "Firebase API anahtarı geçersiz veya henüz yapılandırılmamış. Yerel geliştirme oturumu başlatılıyor."
-      );
-
-      const localProfile: UserProfile = {
-        uid: "local-user-" + Math.abs(email.split("").reduce((a, b) => ((a << 5) - a) + b.charCodeAt(0), 0)),
-        displayName: email.split("@")[0],
-        email,
-        role: "learner",
-        educationLevel: "middle",
-        preferences: defaultPreferences,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        status: "active",
-      };
-
-      if (typeof window !== "undefined") {
-        localStorage.setItem("andaoku_demo_profile", JSON.stringify(localProfile));
-      }
-
-      return { user: null, profile: localProfile, error: null };
-    }
-
-    return { user: null, profile: null, error: error.message || "Giriş yapılamadı." };
+  } catch (error: unknown) {
+    return { user: null, profile: null, error: getAuthErrorMessage(error, "login") };
   }
 }
 
@@ -74,11 +91,23 @@ export async function signUpUser(
   educationLevel: EducationLevel = "middle",
   role: UserRole = "learner"
 ) {
+  if (!isFirebaseConfigured) {
+    return {
+      user: null,
+      profile: null,
+      error: "Firebase yapılandırması eksik. Vercel'de NEXT_PUBLIC_FIREBASE_ değişkenlerini tanımlayıp yeniden dağıtım yapın.",
+    };
+  }
+
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
     const user = userCredential.user;
 
-    await updateProfile(user, { displayName });
+    try {
+      await updateProfile(user, { displayName });
+    } catch (error) {
+      console.warn("Firebase hesabı oluşturuldu ancak görünen ad güncellenemedi:", error);
+    }
 
     const newProfile: UserProfile = {
       uid: user.uid,
@@ -107,38 +136,8 @@ export async function signUpUser(
     }
 
     return { user, profile: newProfile, error: null };
-  } catch (error: any) {
-    const isApiKeyError =
-      error?.code === "auth/api-key-not-valid" ||
-      error?.message?.includes("api-key-not-valid") ||
-      error?.message?.includes("API key");
-
-    // Firebase anahtarı henüz girilmemişse kullanıcıyı engellemeden yerel profil oluştur
-    if (isApiKeyError) {
-      console.warn(
-        "Firebase API anahtarı geçersiz veya henüz yapılandırılmamış. Yerel geliştirme oturumu başlatılıyor."
-      );
-
-      const localProfile: UserProfile = {
-        uid: "local-user-" + Date.now(),
-        displayName: displayName || email.split("@")[0],
-        email,
-        role,
-        educationLevel,
-        preferences: defaultPreferences,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        status: "active",
-      };
-
-      if (typeof window !== "undefined") {
-        localStorage.setItem("andaoku_demo_profile", JSON.stringify(localProfile));
-      }
-
-      return { user: null, profile: localProfile, error: null };
-    }
-
-    return { user: null, profile: null, error: error.message || "Kayıt oluşturulamadı." };
+  } catch (error: unknown) {
+    return { user: null, profile: null, error: getAuthErrorMessage(error, "signup") };
   }
 }
 
@@ -146,17 +145,18 @@ export async function signUpUser(
  * Parola Sıfırlama E-postası Gönderme
  */
 export async function resetPassword(email: string) {
+  if (!isFirebaseConfigured) {
+    return {
+      success: false,
+      error: "Firebase yapılandırması eksik. Vercel ortam değişkenlerini kontrol edip yeniden dağıtım yapın.",
+    };
+  }
+
   try {
     await sendPasswordResetEmail(auth, email);
     return { success: true, error: null };
-  } catch (error: any) {
-    if (error?.code === "auth/api-key-not-valid" || error?.message?.includes("api-key-not-valid")) {
-      return {
-        success: true,
-        error: null,
-      };
-    }
-    return { success: false, error: error.message || "Parola sıfırlama e-postası gönderilemedi." };
+  } catch (error: unknown) {
+    return { success: false, error: getAuthErrorMessage(error, "reset") };
   }
 }
 
