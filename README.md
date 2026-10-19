@@ -1,0 +1,2 @@
+# andaoku
+Hızlı Okuma Platformu
