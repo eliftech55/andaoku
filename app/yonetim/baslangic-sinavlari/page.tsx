@@ -303,7 +303,7 @@ export default function BaslangicSinavlariYonetimPage() {
       createdBy: profile?.uid || "admin",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      publishedAt: formStatus === "published" ? new Date().toISOString() : undefined,
+      ...(formStatus === "published" ? { publishedAt: new Date().toISOString() } : {}),
     };
 
     try {
