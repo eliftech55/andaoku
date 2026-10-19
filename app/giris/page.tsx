@@ -40,7 +40,7 @@ export default function GirisPage() {
     setIsLoading(false);
 
     if (success) {
-      router.push("/panel");
+      router.push("/panel/profil");
     } else {
       setErrorMessage(error || "Giriş başarısız. Lütfen bilgilerinizi kontrol edin.");
     }

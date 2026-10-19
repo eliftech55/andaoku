@@ -197,10 +197,10 @@ export function Navbar() {
 
           {profile ? (
             <div className="flex items-center gap-2">
-              <Link href="/panel">
+              <Link href="/panel/profil">
                 <Button size="sm" variant="secondary" className="flex items-center gap-1.5">
                   <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>{profile.displayName.split(" ")[0]}</span>
+                  <span>Profil</span>
                 </Button>
               </Link>
               <Button size="sm" variant="ghost" onClick={() => logout()} title="Çıkış Yap">
@@ -273,6 +273,15 @@ export function Navbar() {
           >
             Öğrenci Paneli
           </Link>
+          {profile && (
+            <Link
+              href="/panel/profil"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block px-3 py-2 rounded-lg text-sm font-medium text-charcoal hover:bg-ivory-beige"
+            >
+              Profil
+            </Link>
+          )}
           <Link
             href="/panel/okuma-laboratuvari"
             onClick={() => setMobileMenuOpen(false)}
