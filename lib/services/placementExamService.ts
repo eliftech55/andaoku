@@ -45,6 +45,12 @@ function assertFirebaseConfigured() {
   }
 }
 
+function omitUndefinedFields<T extends object>(value: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, fieldValue]) => fieldValue !== undefined)
+  ) as Partial<T>;
+}
+
 export async function getPlacementExamsFromDatabase(): Promise<PlacementExam[]> {
   assertFirebaseConfigured();
   const snapshot = await getDocs(collection(db, "placementExams"));
@@ -83,11 +89,11 @@ export async function savePlacementExamPackageToDatabase(input: {
   const batch = writeBatch(db);
   const { exam, passage, questions } = input;
 
-  batch.set(doc(db, "placementPassages", passage.id), passage);
-  batch.set(doc(db, "placementExams", exam.code), exam);
+  batch.set(doc(db, "placementPassages", passage.id), omitUndefinedFields(passage));
+  batch.set(doc(db, "placementExams", exam.code), omitUndefinedFields(exam));
   questions.forEach((question) => {
     batch.set(doc(db, "placementQuestions", question.id), {
-      ...question,
+      ...omitUndefinedFields(question),
       examId: exam.code,
     });
   });
