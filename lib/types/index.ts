@@ -291,7 +291,7 @@ export interface PlacementExam {
   targetSkills: string[];
   passageId: string;
   passageVersion: number;
-  questionCount: number; // tam olarak 10
+  questionCount: number; // 1 ile 10 arasında
   estimatedReadingSeconds: number;
   targetReadingSeconds?: number;
   readingTimeLimitEnabled: boolean;
@@ -351,4 +351,3 @@ export interface PlacementProfile {
   recommendedModuleIds: string[];
   updatedAt: string;
 }
-

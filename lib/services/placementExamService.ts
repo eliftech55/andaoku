@@ -86,11 +86,22 @@ export async function savePlacementExamPackageToDatabase(input: {
   questions: PlacementQuestion[];
 }): Promise<void> {
   assertFirebaseConfigured();
+  const existingQuestionsQuery = query(
+    collection(db, "placementQuestions"),
+    where("examId", "==", input.exam.code)
+  );
+  const existingQuestions = await getDocs(existingQuestionsQuery);
   const batch = writeBatch(db);
   const { exam, passage, questions } = input;
+  const questionIds = new Set(questions.map((question) => question.id));
 
   batch.set(doc(db, "placementPassages", passage.id), omitUndefinedFields(passage));
   batch.set(doc(db, "placementExams", exam.code), omitUndefinedFields(exam));
+  existingQuestions.docs.forEach((existingQuestion) => {
+    if (!questionIds.has(existingQuestion.id)) {
+      batch.delete(existingQuestion.ref);
+    }
+  });
   questions.forEach((question) => {
     batch.set(doc(db, "placementQuestions", question.id), {
       ...omitUndefinedFields(question),
@@ -243,6 +254,9 @@ export async function evaluatePlacementAttempt(input: {
 
   const passage = await getPlacementPassageById(passageId);
   const questions = await getQuestionsByExamCode(examCode);
+  if (questions.length === 0) {
+    throw new Error("Sınavda değerlendirilecek soru bulunamadı.");
+  }
 
   const wordCount = passage ? passage.wordCount || countTurkishWords(passage.content) : 150;
   // WPM yalnızca okuma süresi üzerinden hesaplanır! Soru süresi dahil edilmez.
@@ -279,7 +293,7 @@ export async function evaluatePlacementAttempt(input: {
     });
   });
 
-  const comprehensionPercentage = calculateComprehensionScore(correctCount, questions.length || 10);
+  const comprehensionPercentage = calculateComprehensionScore(correctCount, questions.length);
 
   const attempt: PlacementAttempt = {
     id: attemptId,
@@ -300,7 +314,7 @@ export async function evaluatePlacementAttempt(input: {
     correctCount,
     incorrectCount,
     unansweredCount,
-    gradableQuestionCount: questions.length || 10,
+    gradableQuestionCount: questions.length,
     comprehensionPercentage,
     status: "completed",
     createdAt: new Date().toISOString(),

@@ -63,7 +63,7 @@ export default function BaslangicSinavlariYonetimPage() {
   const [formGenre, setFormGenre] = useState("bilgilendirici");
   const [formTopic, setFormTopic] = useState("");
 
-  // 10 Soru State
+  // En fazla 10 soru
   const [formQuestions, setFormQuestions] = useState<PlacementQuestion[]>([]);
   const [activeQuestionTab, setActiveQuestionTab] = useState(0);
 
@@ -76,6 +76,28 @@ export default function BaslangicSinavlariYonetimPage() {
   const [previewExam, setPreviewExam] = useState<PlacementExam | null>(null);
   const [previewPassage, setPreviewPassage] = useState<PlacementPassage | null>(null);
   const [previewQuestions, setPreviewQuestions] = useState<PlacementQuestion[]>([]);
+
+  const createEmptyQuestion = (examCode: string, order: number): PlacementQuestion => ({
+    id: `q-${examCode}-${Date.now()}-${order}`,
+    examId: examCode,
+    examVersion: 1,
+    passageVersion: 1,
+    questionText: "",
+    questionType: "acik_bilgi",
+    options: [
+      { id: "A", text: "" },
+      { id: "B", text: "" },
+      { id: "C", text: "" },
+      { id: "D", text: "" },
+    ],
+    correctOptionId: "A",
+    explanation: "",
+    points: 10,
+    order,
+    status: "published",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
 
   useEffect(() => {
     loadAllExams();
@@ -114,30 +136,7 @@ export default function BaslangicSinavlariYonetimPage() {
     setFormGenre("bilgilendirici");
     setFormTopic("");
 
-    // 10 adet boş soru taslağı oluştur
-    const initial10: PlacementQuestion[] = Array.from({ length: 10 }).map((_, idx) => ({
-      id: `q-${Date.now()}-${idx + 1}`,
-      examId: newCode,
-      examVersion: 1,
-      passageVersion: 1,
-      questionText: "",
-      questionType: "acik_bilgi",
-      options: [
-        { id: "A", text: "" },
-        { id: "B", text: "" },
-        { id: "C", text: "" },
-        { id: "D", text: "" },
-      ],
-      correctOptionId: "A",
-      explanation: "",
-      points: 10,
-      order: idx + 1,
-      status: "published",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }));
-
-    setFormQuestions(initial10);
+    setFormQuestions([createEmptyQuestion(newCode, 1)]);
     setActiveQuestionTab(0);
     setValidationErrors([]);
     setEditorModalOpen(true);
@@ -161,8 +160,8 @@ export default function BaslangicSinavlariYonetimPage() {
       if (!passage) {
         throw new Error("Bu sınava bağlı okuma metni veritabanında bulunamadı.");
       }
-      if (qList.length !== 10) {
-        throw new Error(`Bu sınav için veritabanında 10 soru bekleniyor; ${qList.length} soru bulundu.`);
+      if (qList.length < 1 || qList.length > 10) {
+        throw new Error(`Bu sınav için veritabanında 1-10 arasında soru bekleniyor; ${qList.length} soru bulundu.`);
       }
 
       setFormPassageTitle(passage.title);
@@ -234,8 +233,8 @@ export default function BaslangicSinavlariYonetimPage() {
     if (!formPassageTitle.trim()) errors.push("Metin başlığı boş olamaz.");
     if (!formPassageContent.trim()) errors.push("Metin içeriği boş olamaz.");
 
-    if (formQuestions.length !== 10) {
-      errors.push(`Sınavda tam olarak 10 soru bulunmalıdır. Mevcut: ${formQuestions.length}`);
+    if (formQuestions.length < 1 || formQuestions.length > 10) {
+      errors.push(`Sınavda 1 ile 10 arasında soru bulunmalıdır. Mevcut: ${formQuestions.length}`);
     }
 
     formQuestions.forEach((q, idx) => {
@@ -254,6 +253,24 @@ export default function BaslangicSinavlariYonetimPage() {
 
     setValidationErrors(errors);
     return errors.length === 0;
+  };
+
+  const addQuestion = () => {
+    if (formQuestions.length >= 10) return;
+    setFormQuestions((questions) => [
+      ...questions,
+      createEmptyQuestion(formExamCode, questions.length + 1),
+    ]);
+    setActiveQuestionTab(formQuestions.length);
+  };
+
+  const removeCurrentQuestion = () => {
+    if (formQuestions.length <= 1) return;
+    const nextQuestions = formQuestions
+      .filter((_, index) => index !== activeQuestionTab)
+      .map((question, index) => ({ ...question, order: index + 1 }));
+    setFormQuestions(nextQuestions);
+    setActiveQuestionTab(Math.min(activeQuestionTab, nextQuestions.length - 1));
   };
 
   // Kaydetme İşlemi
@@ -293,7 +310,7 @@ export default function BaslangicSinavlariYonetimPage() {
       targetSkills: ["ana_fikir", "cikarim_yapma", "acik_bilgi"],
       passageId,
       passageVersion: 1,
-      questionCount: 10,
+      questionCount: formQuestions.length,
       estimatedReadingSeconds,
       targetReadingSeconds: estimatedReadingSeconds + 15,
       readingTimeLimitEnabled: false,
@@ -338,7 +355,7 @@ export default function BaslangicSinavlariYonetimPage() {
             Başlangıç Sınavı Yönetimi
           </h1>
           <p className="text-xs sm:text-sm text-charcoal-muted">
-            5 eğitim kademesi için seviye belirleme metinlerini ve 10 soruluk test paketlerini yönetin.
+            5 eğitim kademesi için seviye belirleme metinlerini ve 1-10 soruluk test paketlerini yönetin.
           </p>
         </div>
 
@@ -357,7 +374,7 @@ export default function BaslangicSinavlariYonetimPage() {
       {saveSuccessNotice && (
         <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
           <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-          <span>Sınav paketi, metin ve 10 soru başarıyla doğrulandı ve kaydedildi.</span>
+          <span>Sınav paketi, metin ve {formQuestions.length} soru başarıyla doğrulandı ve kaydedildi.</span>
         </div>
       )}
 
@@ -435,13 +452,13 @@ export default function BaslangicSinavlariYonetimPage() {
       </div>
 
       {/* ===================================================== */}
-      {/* SINAV VE 10 SORU DÜZENLEME MODALI                    */}
+      {/* SINAV VE SORU DÜZENLEME MODALI                       */}
       {/* ===================================================== */}
       <Modal
         isOpen={editorModalOpen}
         onClose={() => setEditorModalOpen(false)}
         title={editingExamCode ? "Sınav Paketini Düzenle" : "Yeni Başlangıç Sınavı Oluştur"}
-        description="Özgün metin ve tam olarak 10 çoktan seçmeli soru (A, B, C, D) yapılandırın."
+        description="Özgün metin ve 1-10 arasında çoktan seçmeli soru (A, B, C, D) yapılandırın."
         maxWidth="xl"
         footer={
           <div className="flex gap-2">
@@ -573,22 +590,22 @@ export default function BaslangicSinavlariYonetimPage() {
             </div>
           </div>
 
-          {/* Bölüm 3: 10 Soru Yönetimi */}
+          {/* Bölüm 3: Soru Yönetimi */}
           <div className="p-4 rounded-2xl bg-ivory-warm border border-sage-200 space-y-4">
             <div className="flex items-center justify-between">
               <h4 className="font-bold text-charcoal text-sm flex items-center gap-1.5">
-                <CheckCircle2 className="h-4 w-4 text-amber-600" /> Soru Bankası (Tam 10 Soru)
+                <CheckCircle2 className="h-4 w-4 text-amber-600" /> Soru Bankası ({formQuestions.length}/10)
               </h4>
               <span className="text-xs text-charcoal-muted">
-                Her soruda 4 seçenek (A, B, C, D) ve 1 doğru cevap zorunludur.
+                1-10 soru ekleyin. Her soruda 4 seçenek (A, B, C, D) ve 1 doğru cevap zorunludur.
               </span>
             </div>
 
             {/* Soru Seçme Sekmeleri */}
-            <div className="flex gap-1 overflow-x-auto pb-1">
+            <div className="flex flex-wrap items-center gap-1.5">
               {formQuestions.map((_, i) => (
                 <button
-                  key={i}
+                  key={formQuestions[i].id}
                   type="button"
                   onClick={() => setActiveQuestionTab(i)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 ${
@@ -600,6 +617,24 @@ export default function BaslangicSinavlariYonetimPage() {
                   Soru {i + 1}
                 </button>
               ))}
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={addQuestion}
+                disabled={formQuestions.length >= 10}
+              >
+                <Plus className="mr-1 h-3.5 w-3.5" /> Soru Ekle
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={removeCurrentQuestion}
+                disabled={formQuestions.length <= 1}
+              >
+                Soruyu Sil
+              </Button>
             </div>
 
             {/* Seçili Soru Alanları */}
@@ -712,7 +747,9 @@ export default function BaslangicSinavlariYonetimPage() {
           )}
 
           <div className="space-y-3">
-            <h4 className="font-bold text-charcoal text-sm">Sınav Soruları (Toplam 10 Soru):</h4>
+            <h4 className="font-bold text-charcoal text-sm">
+              Sınav Soruları (Toplam {previewQuestions.length} Soru):
+            </h4>
             {previewQuestions.map((q, idx) => (
               <div key={q.id} className="p-4 rounded-xl bg-ivory-warm border border-sage-200 space-y-2">
                 <span className="font-bold text-charcoal">

@@ -114,7 +114,7 @@ export function Navbar() {
                 }`}
               >
                 <span>Başlangıç Sınavı</span>
-                <Badge variant="amber" className="text-[9px] px-1.5 py-0">10 Soru</Badge>
+                <Badge variant="amber" className="text-[9px] px-1.5 py-0">Seviye Tespit</Badge>
               </Link>
             </>
           )}

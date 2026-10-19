@@ -234,7 +234,7 @@ export function PlacementExamFlow() {
                 <li className="flex items-start gap-2">
                   <div className="h-1.5 w-1.5 rounded-full bg-brand-700 mt-1.5 shrink-0" />
                   <span>
-                    <strong>2. Aşama (Soru Çözme Süresi):</strong> Okuma bitiminde metin gizlenir ve metinle ilgili <strong>tam olarak 10 çoktan seçmeli soru</strong> yöneltilir.
+                    <strong>2. Aşama (Soru Çözme Süresi):</strong>                     Okuma bitiminde metin gizlenir ve metinle ilgili <strong>{questions.length} çoktan seçmeli soru</strong> yöneltilir.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
