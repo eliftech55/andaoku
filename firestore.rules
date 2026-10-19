@@ -1,0 +1,174 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Yardımcı Güvenlik Fonksiyonları
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function hasRole(role) {
+      return isAuthenticated() && (
+        (request.auth.token.role == role) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         getUserData().role == role)
+      );
+    }
+
+    function isAdmin() {
+      return hasRole('admin');
+    }
+
+    function isTeacher() {
+      return hasRole('teacher') || isAdmin();
+    }
+
+    function isContentManager() {
+      return hasRole('content_manager') || isAdmin();
+    }
+
+    function isResearcher() {
+      return hasRole('researcher') || isAdmin();
+    }
+
+    // 1. Kullanıcı Profilleri (users)
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (isOwner(userId) || isTeacher() || isAdmin());
+      allow create: if isOwner(userId) && request.resource.data.role == 'learner';
+      allow update: if isAuthenticated() && (
+        (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'uid', 'status'])) ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // 2. Okuma Metinleri (readingPassages)
+    match /readingPassages/{passageId} {
+      allow read: if isAuthenticated() && (resource.data.status == 'published' || isContentManager());
+      allow create, update, delete: if isContentManager();
+    }
+
+    // 3. Öğrenme Modülleri (learningModules)
+    match /learningModules/{moduleId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isContentManager();
+    }
+
+    // 4. Etkinlikler (activities)
+    match /activities/{activityId} {
+      allow read: if isAuthenticated() && (resource.data.status == 'published' || isContentManager());
+      allow create, update, delete: if isContentManager();
+    }
+
+    // 5. Sorular (questions)
+    match /questions/{questionId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isContentManager();
+    }
+
+    // 6. Okuma Oturumları (readingSessions)
+    match /readingSessions/{sessionId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isTeacher());
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid && resource.data.status != 'completed';
+      allow delete: if isAdmin();
+    }
+
+    // 7. Değerlendirme Sonuçları (assessmentResults)
+    match /assessmentResults/{resultId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isTeacher() ||
+        isResearcher()
+      );
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // 8. Kullanıcı İlerlemesi (userProgress)
+    match /userProgress/{progressId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isTeacher());
+      allow create, update: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isAdmin();
+    }
+
+    // 9. Sınıflar (classes)
+    match /classes/{classId} {
+      allow read: if isAuthenticated();
+      allow create: if isTeacher();
+      allow update, delete: if isTeacher() && resource.data.teacherId == request.auth.uid;
+    }
+
+    // 10. Sınıf Üyelikleri (classMemberships)
+    match /classMemberships/{membershipId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isTeacher());
+      allow create: if isAuthenticated();
+      allow update, delete: if isTeacher();
+    }
+
+    // 11. Öğretmen Atamaları (teacherAssignments)
+    match /teacherAssignments/{assignmentId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isTeacher() && (resource == null || resource.data.teacherId == request.auth.uid);
+    }
+
+    // 12. Denetim Günlükleri (auditLogs)
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated();
+      allow update, delete: if false;
+    }
+
+    // ==========================================
+    // BAŞLANGIÇ SINAVI GÜVENLİK KURALLARI
+    // ==========================================
+
+    // Başlangıç Sınavı Tanımları (placementExams)
+    match /placementExams/{examId} {
+      allow read: if isAuthenticated() && (resource.data.status == 'published' || isContentManager());
+      allow create, update, delete: if isContentManager();
+    }
+
+    // Başlangıç Sınavı Metinleri (placementPassages)
+    match /placementPassages/{passageId} {
+      allow read: if isAuthenticated() && (resource.data.status == 'published' || isContentManager());
+      allow create, update, delete: if isContentManager();
+    }
+
+    // Başlangıç Sınavı Soruları (placementQuestions)
+    // Soru içeriği okunabilir ancak 'correctOptionId' alanı istemci tarafından doğrudan görülemez
+    match /placementQuestions/{questionId} {
+      allow read: if isAuthenticated() && isContentManager();
+      allow create, update, delete: if isContentManager();
+    }
+
+    // Başlangıç Sınavı Denemeleri (placementAttempts)
+    match /placementAttempts/{attemptId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isTeacher() || isResearcher());
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // Öğrenci Yanıt Kayıtları (placementResponses)
+    match /placementResponses/{responseId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isTeacher());
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // Başlangıç Seviye Profilleri (placementProfiles)
+    match /placementProfiles/{userId} {
+      allow read: if isAuthenticated() && (isOwner(userId) || isTeacher() || isAdmin());
+      allow create, update: if isAuthenticated() && isOwner(userId);
+      allow delete: if isAdmin();
+    }
+  }
+}

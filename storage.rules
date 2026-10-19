@@ -1,0 +1,28 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Kullanıcı doğrulama kontrolü
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Herkese açık kütüphane ve içerik varlıkları (kitap kapakları vb.)
+    match /public/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAuthenticated() && request.auth.token.role in ['admin', 'content_manager'];
+    }
+
+    // Kullanıcı profil resimleri ve özel dosyalar
+    match /users/{userId}/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId)
+                   && request.resource.size < 5 * 1024 * 1024 // max 5MB
+                   && request.resource.contentType.matches('image/.*');
+    }
+  }
+}
