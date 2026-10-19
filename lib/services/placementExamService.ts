@@ -25,18 +25,75 @@ import {
   getDoc,
   getDocs,
   setDoc,
-  addDoc,
+  writeBatch,
   query,
   where,
   orderBy,
   serverTimestamp,
 } from "firebase/firestore";
+import { isFirebaseConfigured } from "../firebase/client";
 
 // Local storage önbelleği (Firestore çevrimdışıyken veya demo modunda)
 const STORAGE_KEY_EXAMS = "andaoku_placement_exams";
 const STORAGE_KEY_PASSAGES = "andaoku_placement_passages";
 const STORAGE_KEY_QUESTIONS = "andaoku_placement_questions";
 const STORAGE_KEY_ATTEMPTS = "andaoku_placement_attempts";
+
+function assertFirebaseConfigured() {
+  if (!isFirebaseConfigured) {
+    throw new Error("Firebase yapılandırması eksik. Veritabanı işlemi yapılamıyor.");
+  }
+}
+
+export async function getPlacementExamsFromDatabase(): Promise<PlacementExam[]> {
+  assertFirebaseConfigured();
+  const snapshot = await getDocs(collection(db, "placementExams"));
+  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as PlacementExam));
+}
+
+export async function getPlacementPassageFromDatabase(
+  passageId: string
+): Promise<PlacementPassage | null> {
+  assertFirebaseConfigured();
+  const snapshot = await getDoc(doc(db, "placementPassages", passageId));
+  return snapshot.exists()
+    ? ({ id: snapshot.id, ...snapshot.data() } as PlacementPassage)
+    : null;
+}
+
+export async function getPlacementQuestionsFromDatabase(
+  examCode: string
+): Promise<PlacementQuestion[]> {
+  assertFirebaseConfigured();
+  const questionsQuery = query(
+    collection(db, "placementQuestions"),
+    where("examId", "==", examCode),
+    orderBy("order", "asc")
+  );
+  const snapshot = await getDocs(questionsQuery);
+  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as PlacementQuestion));
+}
+
+export async function savePlacementExamPackageToDatabase(input: {
+  exam: PlacementExam;
+  passage: PlacementPassage;
+  questions: PlacementQuestion[];
+}): Promise<void> {
+  assertFirebaseConfigured();
+  const batch = writeBatch(db);
+  const { exam, passage, questions } = input;
+
+  batch.set(doc(db, "placementPassages", passage.id), passage);
+  batch.set(doc(db, "placementExams", exam.code), exam);
+  questions.forEach((question) => {
+    batch.set(doc(db, "placementQuestions", question.id), {
+      ...question,
+      examId: exam.code,
+    });
+  });
+
+  await batch.commit();
+}
 
 /**
  * Kullanıcının eğitim kademesine göre uygun başlangıç sınavını getirir.

@@ -12,12 +12,10 @@ import {
   PlacementQuestionCategory,
 } from "@/lib/types";
 import {
-  getAllPlacementExams,
-  getPlacementPassageById,
-  getQuestionsByExamCode,
-  savePlacementExam,
-  savePlacementPassage,
-  savePlacementQuestions,
+  getPlacementExamsFromDatabase,
+  getPlacementPassageFromDatabase,
+  getPlacementQuestionsFromDatabase,
+  savePlacementExamPackageToDatabase,
 } from "@/lib/services/placementExamService";
 import { countTurkishWords, formatDuration } from "@/lib/utils/readingMetrics";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -44,6 +42,9 @@ export default function BaslangicSinavlariYonetimPage() {
 
   const [exams, setExams] = useState<PlacementExam[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Düzenleme / Oluşturma Modalı
   const [editorModalOpen, setEditorModalOpen] = useState(false);
@@ -82,11 +83,17 @@ export default function BaslangicSinavlariYonetimPage() {
 
   async function loadAllExams() {
     setLoading(true);
+    setLoadError(null);
     try {
-      const list = await getAllPlacementExams();
+      const list = await getPlacementExamsFromDatabase();
       setExams(list);
     } catch (e) {
       console.error(e);
+      setLoadError(
+        e instanceof Error
+          ? e.message
+          : "Başlangıç sınavları veritabanından yüklenemedi."
+      );
     } finally {
       setLoading(false);
     }
@@ -145,44 +152,29 @@ export default function BaslangicSinavlariYonetimPage() {
     setFormLevel(exam.educationLevels[0] || "middle");
     setFormStatus(exam.status);
 
-    const passage = await getPlacementPassageById(exam.passageId);
-    if (passage) {
+    setLoadError(null);
+    try {
+      const [passage, qList] = await Promise.all([
+        getPlacementPassageFromDatabase(exam.passageId),
+        getPlacementQuestionsFromDatabase(exam.code),
+      ]);
+      if (!passage) {
+        throw new Error("Bu sınava bağlı okuma metni veritabanında bulunamadı.");
+      }
+      if (qList.length !== 10) {
+        throw new Error(`Bu sınav için veritabanında 10 soru bekleniyor; ${qList.length} soru bulundu.`);
+      }
+
       setFormPassageTitle(passage.title);
       setFormPassageContent(passage.content);
       setFormGenre(passage.genre);
       setFormTopic(passage.topic);
-    }
-
-    const qList = await getQuestionsByExamCode(exam.code);
-    if (qList.length === 10) {
       setFormQuestions(qList);
-    } else {
-      // 10'a tamamla
-      const filled: PlacementQuestion[] = Array.from({ length: 10 }).map((_, idx) => {
-        if (qList[idx]) return qList[idx];
-        return {
-          id: `q-${exam.code}-${idx + 1}`,
-          examId: exam.code,
-          examVersion: 1,
-          passageVersion: 1,
-          questionText: "",
-          questionType: "acik_bilgi",
-          options: [
-            { id: "A", text: "" },
-            { id: "B", text: "" },
-            { id: "C", text: "" },
-            { id: "D", text: "" },
-          ],
-          correctOptionId: "A",
-          explanation: "",
-          points: 10,
-          order: idx + 1,
-          status: "published",
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-      });
-      setFormQuestions(filled);
+    } catch (e) {
+      setLoadError(
+        e instanceof Error ? e.message : "Sınav paketi veritabanından yüklenemedi."
+      );
+      return;
     }
 
     setActiveQuestionTab(0);
@@ -192,12 +184,24 @@ export default function BaslangicSinavlariYonetimPage() {
 
   // Ön İzleme Aç
   const handleOpenPreview = async (exam: PlacementExam) => {
-    const passage = await getPlacementPassageById(exam.passageId);
-    const qList = await getQuestionsByExamCode(exam.code);
-    setPreviewExam(exam);
-    setPreviewPassage(passage);
-    setPreviewQuestions(qList);
-    setPreviewModalOpen(true);
+    setLoadError(null);
+    try {
+      const [passage, qList] = await Promise.all([
+        getPlacementPassageFromDatabase(exam.passageId),
+        getPlacementQuestionsFromDatabase(exam.code),
+      ]);
+      if (!passage) {
+        throw new Error("Bu sınava bağlı okuma metni veritabanında bulunamadı.");
+      }
+      setPreviewExam(exam);
+      setPreviewPassage(passage);
+      setPreviewQuestions(qList);
+      setPreviewModalOpen(true);
+    } catch (e) {
+      setLoadError(
+        e instanceof Error ? e.message : "Sınav ön izlemesi veritabanından yüklenemedi."
+      );
+    }
   };
 
   // Soru Güncelleme
@@ -254,7 +258,9 @@ export default function BaslangicSinavlariYonetimPage() {
 
   // Kaydetme İşlemi
   const handleSaveExam = async () => {
-    if (!validateBeforeSave()) return;
+    if (isSaving || !validateBeforeSave()) return;
+    setIsSaving(true);
+    setSaveError(null);
 
     const passageId = editingExamCode ? `pass-${editingExamCode}` : `pass-${formExamCode}`;
     const wordCount = countTurkishWords(formPassageContent);
@@ -300,14 +306,26 @@ export default function BaslangicSinavlariYonetimPage() {
       publishedAt: formStatus === "published" ? new Date().toISOString() : undefined,
     };
 
-    await savePlacementPassage(passageObj);
-    await savePlacementExam(examObj);
-    await savePlacementQuestions(formExamCode, formQuestions);
-
-    setEditorModalOpen(false);
-    setSaveSuccessNotice(true);
-    setTimeout(() => setSaveSuccessNotice(false), 4000);
-    loadAllExams();
+    try {
+      await savePlacementExamPackageToDatabase({
+        exam: examObj,
+        passage: passageObj,
+        questions: formQuestions,
+      });
+      setEditorModalOpen(false);
+      setSaveSuccessNotice(true);
+      setTimeout(() => setSaveSuccessNotice(false), 4000);
+      await loadAllExams();
+    } catch (e) {
+      console.error(e);
+      setSaveError(
+        e instanceof Error
+          ? e.message
+          : "Sınav paketi veritabanına kaydedilemedi."
+      );
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -343,6 +361,18 @@ export default function BaslangicSinavlariYonetimPage() {
         </div>
       )}
 
+      {loadError && (
+        <div role="alert" className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs">
+          Sınav verileri yüklenemedi: {loadError}
+        </div>
+      )}
+
+      {saveError && (
+        <div role="alert" className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs">
+          Sınav paketi kaydedilemedi: {saveError}
+        </div>
+      )}
+
       {/* Sınav Listesi Tablosu */}
       <div className="rounded-2xl border border-sage-200 bg-white overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
@@ -359,7 +389,19 @@ export default function BaslangicSinavlariYonetimPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-sage-100">
-              {exams.map((ex) => (
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="p-8 text-center text-charcoal-muted">
+                    Sınavlar veritabanından yükleniyor...
+                  </td>
+                </tr>
+              ) : exams.length === 0 && !loadError ? (
+                <tr>
+                  <td colSpan={7} className="p-8 text-center text-charcoal-muted">
+                    Veritabanında henüz başlangıç sınavı bulunmuyor. Yeni sınav paketi ekleyerek başlayın.
+                  </td>
+                </tr>
+              ) : exams.map((ex) => (
                 <tr key={ex.code} className="hover:bg-ivory-warm/50 transition-colors">
                   <td className="p-3.5 font-bold text-charcoal">{ex.title}</td>
                   <td className="p-3.5 font-mono text-[11px] text-charcoal-muted">{ex.code}</td>
@@ -406,13 +448,19 @@ export default function BaslangicSinavlariYonetimPage() {
             <Button variant="outline" size="sm" onClick={() => setEditorModalOpen(false)}>
               Vazgeç
             </Button>
-            <Button variant="primary" size="sm" onClick={handleSaveExam}>
-              Doğrula ve Kaydet
+            <Button variant="primary" size="sm" onClick={handleSaveExam} isLoading={isSaving}>
+              {isSaving ? "Kaydediliyor..." : "Doğrula ve Kaydet"}
             </Button>
           </div>
         }
       >
         <div className="space-y-6 text-xs max-h-[70vh] overflow-y-auto pr-1">
+          {saveError && (
+            <div role="alert" className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800">
+              {saveError}
+            </div>
+          )}
+
           {/* Doğrulama Hata Mesajları */}
           {validationErrors.length > 0 && (
             <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 space-y-1">
