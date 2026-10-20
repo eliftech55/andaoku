@@ -103,11 +103,9 @@ export async function signUpUser(
     const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
     const user = userCredential.user;
 
-    try {
-      await updateProfile(user, { displayName });
-    } catch (error) {
+    void updateProfile(user, { displayName }).catch((error: unknown) => {
       console.warn("Firebase hesabı oluşturuldu ancak görünen ad güncellenemedi:", error);
-    }
+    });
 
     const newProfile: UserProfile = {
       uid: user.uid,
@@ -121,18 +119,19 @@ export async function signUpUser(
       status: "active",
     };
 
-    // Firestore'a kullanıcı profil belgesini kaydet
-    try {
-      await setDoc(doc(db, "users", user.uid), {
-        ...newProfile,
-        serverCreatedAt: serverTimestamp(),
-      });
-    } catch (dbErr) {
-      console.warn("Firestore profili kaydedilirken uyarı:", dbErr);
-    }
+    void setDoc(doc(db, "users", user.uid), {
+      ...newProfile,
+      serverCreatedAt: serverTimestamp(),
+    }).catch((dbErr: unknown) => {
+      console.error("Firebase hesabı oluşturuldu ancak Firestore profili kaydedilemedi:", dbErr);
+    });
 
     if (typeof window !== "undefined") {
-      localStorage.setItem("andaoku_demo_profile", JSON.stringify(newProfile));
+      try {
+        localStorage.setItem("andaoku_demo_profile", JSON.stringify(newProfile));
+      } catch (storageError) {
+        console.warn("Firebase hesabı oluşturuldu ancak profil tarayıcıya kaydedilemedi:", storageError);
+      }
     }
 
     return { user, profile: newProfile, error: null };
