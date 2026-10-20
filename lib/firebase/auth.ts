@@ -1,6 +1,7 @@
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  deleteUser,
   signOut,
   sendPasswordResetEmail,
   updateProfile,
@@ -119,12 +120,30 @@ export async function signUpUser(
       status: "active",
     };
 
-    void setDoc(doc(db, "users", user.uid), {
-      ...newProfile,
-      serverCreatedAt: serverTimestamp(),
-    }).catch((dbErr: unknown) => {
+    try {
+      await setDoc(doc(db, "users", user.uid), {
+        ...newProfile,
+        serverCreatedAt: serverTimestamp(),
+      });
+    } catch (dbErr: unknown) {
       console.error("Firebase hesabı oluşturuldu ancak Firestore profili kaydedilemedi:", dbErr);
-    });
+      try {
+        await deleteUser(user);
+      } catch (cleanupError: unknown) {
+        console.error("Profili kaydedilemeyen Firebase hesabı temizlenemedi:", cleanupError);
+        return {
+          user: null,
+          profile: null,
+          error: "Hesap oluşturuldu ancak profil kaydedilemedi ve hesap otomatik olarak temizlenemedi. Lütfen destek ekibiyle iletişime geçin.",
+        };
+      }
+
+      return {
+        user: null,
+        profile: null,
+        error: "Kayıt profili Firestore'a kaydedilemediği için hesap oluşturma işlemi geri alındı. Lütfen tekrar deneyin.",
+      };
+    }
 
     if (typeof window !== "undefined") {
       try {

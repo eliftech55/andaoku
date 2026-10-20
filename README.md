@@ -34,7 +34,7 @@ Uygulama varsayılan olarak **http://localhost:3005** adresinde çalışmaya ba�
 - **Görselleştirme:** Recharts (WPM Hız Değişimi, Anlama Puanı, Beceri Dağılım Grafikleri)
 - **Veritabanı & Kimlik Doğrulama:** Google Cloud Firestore & Firebase Authentication
 - **Yetkilendirme:** Rol tabanlı erişim (`learner`, `teacher`, `content_manager`, `admin`, `researcher`)
-- **Güvenlik Kuralları:** `firestore.rules` (Default-deny prensibiyle yazılmış, öğrenci ve sınıf izolasyonu sağlayan güvenlik kuralları)
+- **Güvenlik Kuralları:** `firestore.rules` açık erişim kuralları içerir; sınıf bazlı öğretmen erişimi ve değerlendirme yanıtlarının gizliliği üretim öncesinde ayrıca sıkılaştırılmalıdır.
 - **Test:** Vitest ile WPM, kelime sayımı, anlama puanı ve öneri motoru birim testleri
 
 ---
@@ -67,4 +67,39 @@ Uygulama varsayılan olarak **http://localhost:3005** adresinde çalışmaya ba�
 ```bash
 npm test
 ```
-Tüm birim ve kural testleri Vitest ile koşturulur.
+Vitest birim testlerini çalıştırır.
+
+---
+
+## 🔥 Firebase Kurulumu
+
+Bu depo `andaoku` Firebase projesini varsayılan hedef olarak kullanır (`.firebaserc`). Komut çalıştırmadan önce hedefi `firebase projects:list` ile doğrulayın; üretim verileriyle ilgili komutlarda `--project andaoku` parametresini açıkça kullanın.
+
+1. Firebase Console'da `andaoku` projesini açın ve Web uygulaması yapılandırmasını alın.
+2. Authentication → Sign-in method bölümünde Email/Password girişini etkinleştirin.
+3. Cloud Firestore'u **Standard / Production mode** ile oluşturun. Firestore konumu oluşturulduktan sonra değiştirilemez; bu uygulamanın veritabanı `europe-west3` (Frankfurt) konumunda oluşturulmuştur.
+4. `.env.example` dosyasını `.env.local` olarak kopyalayıp altı `NEXT_PUBLIC_FIREBASE_*` değerini Web uygulaması ayarlarıyla doldurun. `.env.local` dosyasını Git'e eklemeyin.
+5. Firebase CLI ile giriş yapın ve kuralları/indeksleri yayınlayın:
+
+   ```bash
+   firebase login
+   firebase projects:list
+   firebase deploy --only firestore:rules,firestore:indexes --project andaoku
+   ```
+
+6. Vercel'de aynı altı `NEXT_PUBLIC_FIREBASE_*` değişkenini Production ve Preview ortamlarına ekleyip yeni deployment oluşturun.
+7. Uygulama yapılandırması, kurallar ve indeksler doğrulanmadan Firebase bağlantısının üretimde çalıştığını varsaymayın.
+
+### Yerel Firebase Emulator'ları
+
+Auth ve Firestore Emulator'ları `firebase.json` içinde tanımlıdır. Test verilerini canlı projeye göndermemek için yerel geliştirmede `demo-andaoku` gibi `demo-` ile başlayan bir proje kimliği kullanın:
+
+```bash
+firebase emulators:start --only auth,firestore --project demo-andaoku
+```
+
+Emulator kullanımı uygulamada ayrıca etkinleştirilmelidir; canlı Firebase ayarları emulator bağlantısına otomatik yönlendirilmez.
+
+### Firebase Storage
+
+Uygulamanın şu an Storage'a bağlı bir kullanıcı akışı yoktur; bu nedenle Storage bucket'ı etkinleştirilmemiştir. Dosya yükleme özelliği eklenecekse Firebase Storage kurulumu ve gerekebilecek Blaze faturalandırma planı önce ayrıca değerlendirilmelidir.
