@@ -53,8 +53,13 @@ export default function RunExercisePage() {
           return;
         }
         const assignedModule = modules.find((item) => item.id === loadedActivity.moduleId);
-        if (!assignedModule || !assignedModule.exerciseTypes?.includes(loadedActivity.type as ExerciseKind)) {
-          setError("Bu egzersiz şu anda bir öğrenci modülüne atanmamış.");
+        const assignedLevels = assignedModule?.exerciseLevels?.[loadedActivity.type as ExerciseKind];
+        const isAssigned =
+          assignedModule?.exerciseTypes?.includes(loadedActivity.type as ExerciseKind) &&
+          (assignedModule.activityIds?.includes(loadedActivity.id) ?? true) &&
+          (!assignedLevels || assignedLevels.includes(loadedActivity.level || 0));
+        if (!assignedModule || !isAssigned) {
+          setError("Bu egzersiz seviyesi şu anda öğrenci modülüne atanmamış.");
           return;
         }
         setActivity(loadedActivity);

@@ -87,6 +87,44 @@ export default function OgrenmeYoluPage() {
         </p>
       </div>
 
+      <section aria-labelledby="completed-modules-heading" className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Award className="h-5 w-5 text-emerald-700" />
+          <h2 id="completed-modules-heading" className="text-xl font-bold font-serif text-charcoal">
+            Tamamlanan modüller ve puanlar
+          </h2>
+        </div>
+        {modules.some((module) => completedModuleIds.has(module.id)) ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {modules
+              .filter((module) => completedModuleIds.has(module.id))
+              .map((module) => {
+                const progress = progressList.find((item) => item.moduleId === module.id);
+                return (
+                  <Card key={module.id} className="border-emerald-200 bg-emerald-50/40">
+                    <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+                      <div>
+                        <p className="font-semibold text-charcoal">{module.title}</p>
+                        <p className="mt-1 text-xs text-charcoal-muted">
+                          Okuma: {progress?.readingScore === undefined ? "—" : `%${progress.readingScore}`}
+                          {" · "}Egzersiz: {progress?.exerciseScore === undefined ? "—" : `%${progress.exerciseScore}`}
+                        </p>
+                      </div>
+                      <Badge variant="success" className="text-sm">
+                        Modül puanı %{progress?.overallScore ?? progress?.completionPercentage ?? 0}
+                      </Badge>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+          </div>
+        ) : (
+          <p className="rounded-xl border border-sage-200 bg-white p-4 text-sm text-charcoal-muted">
+            Henüz tamamlanan modül yok. Modül puanınız en az %70 olduğunda burada görünür.
+          </p>
+        )}
+      </section>
+
       <div className="space-y-6 relative before:absolute before:inset-0 before:left-7 before:w-1 before:bg-sage-200 before:hidden sm:before:block">
         {modules.map((mod) => {
           const isCompleted = completedModuleIds.has(mod.id);
@@ -199,7 +237,7 @@ export default function OgrenmeYoluPage() {
                         {mod.exerciseTypes?.length ? (
                           <Link href={`/panel/egzersizler?moduleId=${encodeURIComponent(mod.id)}`}>
                             <Button size="sm" variant={isCompleted ? "outline" : "amber"} className="font-semibold">
-                              <Play className="mr-1.5 h-3.5 w-3.5" />Beş seviyeli egzersizler
+                              <Play className="mr-1.5 h-3.5 w-3.5" />Atanmış egzersizler
                             </Button>
                           </Link>
                         ) : moduleActivities.length > 0 ? (

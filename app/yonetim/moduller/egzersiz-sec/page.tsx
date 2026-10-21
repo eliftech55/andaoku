@@ -18,12 +18,27 @@ const KIND_ORDER: ExerciseKind[] = [
   "flash_words",
 ];
 
+const EXERCISE_LEVELS = [1, 2, 3, 4, 5];
+
 const KIND_LABELS: Record<ExerciseKind, string> = {
   peripheral_vision: "Çevresel Görüş",
   target_scan: "Hedef ve Harf Tarama",
   eye_saccade: "Göz Sıçraması",
   flash_words: "Flaş Kelime Tanıma",
 };
+
+function getInitialExerciseLevels(
+  module: LearningModule | undefined
+): Partial<Record<ExerciseKind, number[]>> {
+  const defaults = module?.order === 1 ? [1, 2, 3] : EXERCISE_LEVELS;
+  return (module?.exerciseTypes || []).reduce<Partial<Record<ExerciseKind, number[]>>>(
+    (levels, kind) => {
+      levels[kind] = module?.exerciseLevels?.[kind] || defaults;
+      return levels;
+    },
+    {}
+  );
+}
 
 function SelectModuleExercisesContent() {
   const searchParams = useSearchParams();
@@ -32,6 +47,7 @@ function SelectModuleExercisesContent() {
   const [definitions, setDefinitions] = useState<ExerciseDefinition[]>([]);
   const [selectedModuleId, setSelectedModuleId] = useState("");
   const [selectedKinds, setSelectedKinds] = useState<ExerciseKind[]>([]);
+  const [selectedLevels, setSelectedLevels] = useState<Partial<Record<ExerciseKind, number[]>>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +74,7 @@ function SelectModuleExercisesContent() {
         setSelectedModuleId(initialModuleId);
         const initialModule = moduleList.find((module) => module.id === initialModuleId);
         setSelectedKinds(initialModule?.exerciseTypes || []);
+        setSelectedLevels(getInitialExerciseLevels(initialModule));
       } catch (loadError) {
         console.error("Modül egzersiz seçimi yüklenemedi:", loadError);
         if (active) setError("Modül veya egzersiz kataloğu yüklenemedi.");
@@ -71,17 +88,39 @@ function SelectModuleExercisesContent() {
     };
   }, [authLoading, profile, searchParams]);
 
+  const selectedModule = modules.find((module) => module.id === selectedModuleId);
+
   const handleModuleChange = (moduleId: string) => {
     setSelectedModuleId(moduleId);
     const module = modules.find((item) => item.id === moduleId);
     setSelectedKinds(module?.exerciseTypes || []);
+    setSelectedLevels(getInitialExerciseLevels(module));
     setSuccess(null);
   };
 
   const handleToggleKind = (kind: ExerciseKind) => {
-    setSelectedKinds((current) =>
-      current.includes(kind) ? current.filter((value) => value !== kind) : [...current, kind]
-    );
+    if (selectedKinds.includes(kind)) {
+      setSelectedKinds((current) => current.filter((value) => value !== kind));
+      return;
+    }
+    setSelectedKinds((current) => [...current, kind]);
+    setSelectedLevels((current) => ({
+      ...current,
+      [kind]: selectedModule?.exerciseLevels?.[kind] ||
+        (selectedModule?.order === 1 ? [1, 2, 3] : EXERCISE_LEVELS),
+    }));
+  };
+
+  const handleToggleLevel = (kind: ExerciseKind, level: number) => {
+    setSelectedLevels((current) => {
+      const currentLevels = current[kind] || [];
+      const highestLevel = Math.max(0, ...currentLevels);
+      const nextLevels =
+        level > highestLevel
+          ? EXERCISE_LEVELS.filter((item) => item <= level)
+          : EXERCISE_LEVELS.filter((item) => item < level && currentLevels.includes(item));
+      return { ...current, [kind]: nextLevels };
+    });
   };
 
   const handleSave = async () => {
@@ -93,19 +132,21 @@ function SelectModuleExercisesContent() {
     setError(null);
     setSuccess(null);
     try {
-      await assignExercisesToModule(selectedModuleId, selectedKinds, definitions);
+      await assignExercisesToModule(selectedModuleId, selectedKinds, selectedLevels, definitions);
       const selectedModule = modules.find((module) => module.id === selectedModuleId);
       setModules((current) =>
         current.map((module) =>
-          module.id === selectedModuleId ? { ...module, exerciseTypes: selectedKinds } : module
+          module.id === selectedModuleId
+            ? { ...module, exerciseTypes: selectedKinds, exerciseLevels: selectedLevels }
+            : module
         )
       );
       setSuccess(
-        `${selectedModule?.title || "Modül"} için seçilen egzersizlerin beşer seviyesi bağlandı. Modül başarısı okuma ve egzersiz puanlarının ortalamasında en az %70 gerektirir.`
+        `${selectedModule?.title || "Modül"} için seçilen egzersiz seviyeleri bağlandı. Modül başarısı okuma ve egzersiz puanlarının ortalamasında en az %70 gerektirir.`
       );
     } catch (saveError) {
       console.error("Modül egzersizleri kaydedilemedi:", saveError);
-      setError("Seçimler kaydedilemedi. Her seçili egzersiz türünde yayımlanmış beş seviye bulunmalı.");
+      setError("Seçimler kaydedilemedi. Her seçili egzersiz türü için seviyeleri 1’den başlayarak kesintisiz seçin ve seviyelerin yayımlanmış olduğunu doğrulayın.");
     } finally {
       setSaving(false);
     }
@@ -118,7 +159,6 @@ function SelectModuleExercisesContent() {
     return <div className="container mx-auto px-4 py-10"><p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Modüllere egzersiz atamak için yönetici yetkisi gerekir.</p></div>;
   }
 
-  const selectedModule = modules.find((module) => module.id === selectedModuleId);
   const catalogReady = KIND_ORDER.every(
     (kind) => definitions.filter((definition) => definition.kind === kind && definition.status === "published").length === 5
   );
@@ -128,7 +168,7 @@ function SelectModuleExercisesContent() {
       <header className="space-y-2 border-b border-sage-200 pb-4">
         <Badge variant="amber">Müfredat Düzenleme</Badge>
         <h1 className="text-3xl font-extrabold font-serif text-charcoal">Modüle Egzersiz Seç</h1>
-        <p className="text-sm text-charcoal-muted">Seçilen her egzersiz türü beş kademeli olarak modüle bağlanır. İlerleme bir önceki seviyede %70 alınca açılır.</p>
+        <p className="text-sm text-charcoal-muted">Modüle atanacak egzersiz türlerini ve seviyelerini seçin. Seviye seçimi 1’den başlayarak kesintisiz olmalıdır; sonraki seviye bir önceki seviyede %70 alınca açılır.</p>
       </header>
 
       {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">{error}</p>}
@@ -161,16 +201,49 @@ function SelectModuleExercisesContent() {
                     (definition) => definition.kind === kind && definition.status === "published"
                   ).length;
                   return (
-                    <label key={kind} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${selectedKinds.includes(kind) ? "border-amber-400 bg-amber-50" : "border-sage-200 bg-white"}`}>
-                      <input type="checkbox" checked={selectedKinds.includes(kind)} onChange={() => handleToggleKind(kind)} />
-                      <span className="flex-1">
-                        <span className="flex items-center gap-2 font-semibold text-charcoal">
-                          {kind === "flash_words" ? <BookOpen className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          {KIND_LABELS[kind]}
+                    <div key={kind} className={`rounded-xl border p-4 ${selectedKinds.includes(kind) ? "border-amber-400 bg-amber-50" : "border-sage-200 bg-white"}`}>
+                      <label className="flex cursor-pointer items-start gap-3">
+                        <input type="checkbox" checked={selectedKinds.includes(kind)} onChange={() => handleToggleKind(kind)} />
+                        <span className="flex-1">
+                          <span className="flex items-center gap-2 font-semibold text-charcoal">
+                            {kind === "flash_words" ? <BookOpen className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            {KIND_LABELS[kind]}
+                          </span>
+                          <span className="mt-1 block text-xs text-charcoal-muted">{publishedLevels}/5 yayımlanmış seviye</span>
                         </span>
-                        <span className="mt-1 block text-xs text-charcoal-muted">{publishedLevels}/5 yayımlanmış seviye</span>
-                      </span>
-                    </label>
+                      </label>
+                      {selectedKinds.includes(kind) && (
+                        <fieldset className="mt-4 border-t border-sage-200 pt-3">
+                          <legend className="mb-2 text-xs font-semibold text-charcoal">Modülde kullanılacak seviyeler</legend>
+                          <div className="flex flex-wrap gap-2">
+                            {EXERCISE_LEVELS.map((level) => {
+                              const isPublished = definitions.some(
+                                (definition) =>
+                                  definition.kind === kind &&
+                                  definition.level === level &&
+                                  definition.status === "published"
+                              );
+                              return (
+                                <label
+                                  key={level}
+                                  className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs ${
+                                    isPublished ? "cursor-pointer border-sage-200 bg-white" : "cursor-not-allowed border-sage-100 opacity-50"
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={(selectedLevels[kind] || []).includes(level)}
+                                    disabled={!isPublished}
+                                    onChange={() => handleToggleLevel(kind, level)}
+                                  />
+                                  Seviye {level}
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </fieldset>
+                      )}
+                    </div>
                   );
                 })}
               </fieldset>
@@ -178,6 +251,13 @@ function SelectModuleExercisesContent() {
                 <p className="font-semibold text-charcoal">Başarı hesabı</p>
                 <p>Modül puanı = (okuduğunu anlama puanı + seçilen egzersiz türlerinin en iyi puanlarının ortalaması) / 2.</p>
                 <p className="mt-1">Tüm seçilen egzersiz türlerinde en az bir deneme ve toplamda en az %70 gerekir. Sonraki egzersiz seviyesi, önceki seviye puanı %70 olduğunda açılır.</p>
+                {selectedKinds.length > 0 && (
+                  <p className="mt-2">
+                    Seçilen seviyeler: {selectedKinds.map((kind) =>
+                      `${KIND_LABELS[kind]} (${(selectedLevels[kind] || []).map((level) => level).join(", ") || "seviye seçilmedi"})`
+                    ).join(" · ")}
+                  </p>
+                )}
                 {selectedModule?.activityIds?.length ? <p className="mt-2">Bu modülde şu anda {selectedModule.activityIds.length} seviye etkinliği var; kaydetmek mevcut atamayı günceller.</p> : null}
               </div>
               <div className="flex justify-end">

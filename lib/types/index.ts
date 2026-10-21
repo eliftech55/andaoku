@@ -80,6 +80,7 @@ export interface LearningModule {
   educationLevel?: EducationLevel;
   readingPassageId?: string;
   exerciseTypes?: ExerciseKind[];
+  exerciseLevels?: Partial<Record<ExerciseKind, number[]>>;
   activityIds?: string[];
   requiredCompletionScore?: number;
   order: number;

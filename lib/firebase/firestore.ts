@@ -169,6 +169,7 @@ export async function saveExerciseDefinition(definition: ExerciseDefinition): Pr
 export async function assignExercisesToModule(
   moduleId: string,
   exerciseTypes: ExerciseKind[],
+  exerciseLevels: Partial<Record<ExerciseKind, number[]>>,
   definitions: ExerciseDefinition[]
 ): Promise<void> {
   const moduleRef = doc(db, "learningModules", moduleId);
@@ -178,12 +179,28 @@ export async function assignExercisesToModule(
   }
 
   const module = { id: moduleSnapshot.id, ...moduleSnapshot.data() } as LearningModule;
+  const normalizedLevels: Partial<Record<ExerciseKind, number[]>> = {};
+  for (const kind of exerciseTypes) {
+    const levels = Array.from(new Set(exerciseLevels[kind] || [])).sort(
+      (left, right) => left - right
+    );
+    if (!levels.length || levels.some((level, index) => level !== index + 1)) {
+      throw new Error("Egzersiz seviyeleri 1’den başlayarak kesintisiz seçilmelidir.");
+    }
+    normalizedLevels[kind] = levels;
+  }
   const assignedDefinitions = definitions.filter(
-    (definition) => exerciseTypes.includes(definition.kind) && definition.status === "published"
+    (definition) =>
+      exerciseTypes.includes(definition.kind) &&
+      normalizedLevels[definition.kind]?.includes(definition.level) &&
+      definition.status === "published"
   );
-  const expectedDefinitionCount = exerciseTypes.length * 5;
+  const expectedDefinitionCount = exerciseTypes.reduce(
+    (total, kind) => total + (normalizedLevels[kind]?.length || 0),
+    0
+  );
   if (assignedDefinitions.length !== expectedDefinitionCount) {
-    throw new Error("Her seçili egzersiz türü için yayımlanmış beş seviye bulunmalıdır.");
+    throw new Error("Seçilen her egzersiz seviyesi yayımlanmış olmalıdır.");
   }
 
   const nextActivities: Activity[] = assignedDefinitions.map((definition) => {
@@ -230,6 +247,7 @@ export async function assignExercisesToModule(
   });
   batch.set(moduleRef, {
     exerciseTypes,
+    exerciseLevels: normalizedLevels,
     activityIds: nextActivities.map((activity) => activity.id),
     requiredCompletionScore: 70,
     updatedAt: new Date().toISOString(),
@@ -385,6 +403,23 @@ export async function getUserExerciseAttempts(userId: string): Promise<ExerciseA
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
 
+function getBestExerciseScoresForModule(
+  attempts: ExerciseAttempt[],
+  moduleId: string,
+  module: LearningModule | null
+): Partial<Record<ExerciseKind, number>> {
+  const bestScores: Partial<Record<ExerciseKind, number>> = {};
+  for (const attempt of attempts) {
+    if (attempt.moduleId !== moduleId) continue;
+    if (module?.activityIds && !module.activityIds.includes(attempt.activityId)) continue;
+    bestScores[attempt.exerciseKind] = Math.max(
+      bestScores[attempt.exerciseKind] || 0,
+      attempt.score
+    );
+  }
+  return bestScores;
+}
+
 export async function saveExerciseAttempt(
   attempt: Omit<ExerciseAttempt, "id">
 ): Promise<ExerciseAttempt> {
@@ -403,15 +438,11 @@ export async function saveExerciseAttempt(
     const existingProgress = progressSnapshot.exists()
       ? (progressSnapshot.data() as UserProgress)
       : null;
-    const bestExerciseScores = { ...(existingProgress?.bestExerciseScores || {}) };
-
-    for (const item of attempts) {
-      if (item.moduleId !== attempt.moduleId) continue;
-      bestExerciseScores[item.exerciseKind] = Math.max(
-        bestExerciseScores[item.exerciseKind] || 0,
-        item.score
-      );
-    }
+    const bestExerciseScores = getBestExerciseScoresForModule(
+      attempts,
+      attempt.moduleId,
+      module
+    );
 
     const score = calculateModuleScore({
       readingScore: existingProgress?.readingScore,
@@ -445,9 +476,10 @@ export async function saveModuleReadingScore(
   moduleId: string,
   readingScore: number
 ): Promise<void> {
-  const [moduleSnapshot, progressSnapshot] = await Promise.all([
+  const [moduleSnapshot, progressSnapshot, attempts] = await Promise.all([
     getDoc(doc(db, "learningModules", moduleId)),
     getDoc(doc(db, "userProgress", `${userId}_${moduleId}`)),
+    getUserExerciseAttempts(userId),
   ]);
   const module = moduleSnapshot.exists()
     ? ({ id: moduleSnapshot.id, ...moduleSnapshot.data() } as LearningModule)
@@ -456,7 +488,7 @@ export async function saveModuleReadingScore(
     ? (progressSnapshot.data() as UserProgress)
     : null;
   const bestReadingScore = Math.max(existingProgress?.readingScore || 0, readingScore);
-  const bestExerciseScores = existingProgress?.bestExerciseScores || {};
+  const bestExerciseScores = getBestExerciseScoresForModule(attempts, moduleId, module);
   const score = calculateModuleScore({
     readingScore: bestReadingScore,
     exerciseTypes: module?.exerciseTypes || [],

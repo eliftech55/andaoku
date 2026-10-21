@@ -86,11 +86,18 @@ export default function StudentExercisesPage() {
       {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">{error}</p>}
       {modules.length === 0 && !error && <Card><CardContent className="p-6 text-sm text-charcoal-muted">Henüz yayımlanmış modül bulunmuyor.</CardContent></Card>}
       {modules.map((module) => {
+        const exerciseKinds = module.exerciseTypes || [];
+        const assignedLevels = module.exerciseLevels || {};
         const moduleActivities = activities
-          .filter((activity) => activity.moduleId === module.id)
+          .filter(
+            (activity) =>
+              activity.moduleId === module.id &&
+              exerciseKinds.includes(activity.type as ExerciseKind) &&
+              (module.activityIds?.includes(activity.id) ?? true) &&
+              (assignedLevels[activity.type as ExerciseKind] || [1, 2, 3, 4, 5]).includes(activity.level || 0)
+          )
           .sort((left, right) => (left.level || 0) - (right.level || 0));
         const moduleProgress = progress.find((item) => item.moduleId === module.id);
-        const exerciseKinds = module.exerciseTypes || [];
         return (
           <Card key={module.id} className="border-sage-200">
             <CardHeader>
