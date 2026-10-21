@@ -6,8 +6,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, setDoc } from "firebase/firestore";
 import { db, isFirebaseConfigured } from "@/lib/firebase/client";
+import { SEED_PASSAGES } from "@/lib/services/seedData";
 import {
   Users,
   FileText,
@@ -25,25 +26,22 @@ type DashboardStats = {
   totalModules: number;
 };
 
-const emptyStats: DashboardStats = {
-  totalUsers: 0,
-  publishedPassages: 0,
-  draftPassages: 0,
-  activeModules: 0,
-  totalModules: 0,
-};
-
 export default function YonetimPaneliPage() {
   const { profile, loading: authLoading } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [firestoreError, setFirestoreError] = useState<string | null>(null);
+  const [missingSeedPassages, setMissingSeedPassages] = useState<string[]>([]);
+  const [seedMessage, setSeedMessage] = useState<string | null>(null);
+  const [isSeeding, setIsSeeding] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     if (authLoading) return;
 
     if (!profile || profile.role !== "admin") {
       setStats(null);
+      setMissingSeedPassages([]);
       setFirestoreError(null);
       setIsLoading(false);
       return;
@@ -73,6 +71,7 @@ export default function YonetimPaneliPage() {
 
         const passages = passagesSnapshot.docs.map((document) => document.data());
         const modules = modulesSnapshot.docs.map((document) => document.data());
+        const passageIds = new Set(passagesSnapshot.docs.map((document) => document.id));
         const publishedPassages = passages.filter((passage) => passage.status === "published").length;
         const draftPassages = passages.filter((passage) => passage.status === "draft").length;
 
@@ -83,6 +82,9 @@ export default function YonetimPaneliPage() {
           activeModules: modules.filter((module) => module.status === "published").length,
           totalModules: modulesSnapshot.size,
         });
+        setMissingSeedPassages(
+          SEED_PASSAGES.filter((passage) => !passageIds.has(passage.id)).map((passage) => passage.id)
+        );
         setFirestoreError(null);
       } catch (error) {
         console.error("Yönetici paneli Firestore verileri yüklenemedi:", error);
@@ -102,26 +104,64 @@ export default function YonetimPaneliPage() {
     return () => {
       isCurrent = false;
     };
-  }, [authLoading, profile]);
+  }, [authLoading, profile, refreshKey]);
 
-  const displayedStats = stats ?? emptyStats;
+  const hasAdminAccess = !authLoading && profile?.role === "admin";
+  const displayedStats = stats;
+
+  const handleImportSeedPassages = async () => {
+    if (!hasAdminAccess || !isFirebaseConfigured || isSeeding) return;
+
+    setIsSeeding(true);
+    setSeedMessage(null);
+
+    try {
+      const missing = SEED_PASSAGES.filter((passage) => missingSeedPassages.includes(passage.id));
+      await Promise.all(
+        missing.map(async ({ id, ...passage }) => {
+          const passageRef = doc(db, "readingPassages", id);
+          const existingPassage = await getDoc(passageRef);
+          if (!existingPassage.exists()) {
+            await setDoc(passageRef, passage);
+          }
+        })
+      );
+
+      setSeedMessage("Eksik örnek metinler Firestore’a aktarıldı.");
+      setRefreshKey((key) => key + 1);
+    } catch (error) {
+      console.error("Örnek metinler Firestore’a aktarılamadı:", error);
+      setSeedMessage(
+        "Örnek metinler aktarılamadı. Firestore erişim yetkinizi kontrol edip yeniden deneyin."
+      );
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
   const systemStats = [
     {
       label: "Toplam Kullanıcı",
-      val: isLoading || !stats ? "—" : String(displayedStats.totalUsers),
+      val: isLoading || !hasAdminAccess || !displayedStats ? "—" : String(displayedStats.totalUsers),
       change: "Firestore kullanıcı profilleri",
       icon: Users,
     },
     {
       label: "Yayınlanan Metinler",
-      val: isLoading || !stats ? "—" : String(displayedStats.publishedPassages),
-      change: isLoading || !stats ? "Yayın durumu Firestore’dan alınır" : `${displayedStats.draftPassages} taslak`,
+      val:
+        isLoading || !hasAdminAccess || !displayedStats
+          ? "—"
+          : String(displayedStats.publishedPassages),
+      change:
+        isLoading || !hasAdminAccess || !displayedStats
+          ? "Yayın durumu Firestore’dan alınır"
+          : `${displayedStats.draftPassages} taslak`,
       icon: FileText,
     },
     {
       label: "Aktif Modül",
       val:
-        isLoading || !stats
+        isLoading || !hasAdminAccess || !displayedStats
           ? "—"
           : `${displayedStats.activeModules} / ${displayedStats.totalModules}`,
       change: "Yayınlanan / toplam öğrenme modülü",
@@ -129,8 +169,16 @@ export default function YonetimPaneliPage() {
     },
     {
       label: "Firestore Durumu",
-      val: isLoading ? "Kontrol ediliyor" : firestoreError ? "Bağlantı hatası" : "Bağlı",
-      change: firestoreError || "Kullanıcı, metin ve modül sorguları başarılı",
+      val: isLoading
+        ? "Kontrol ediliyor"
+        : !hasAdminAccess
+          ? "Yönetici girişi gerekli"
+          : firestoreError
+            ? "Bağlantı hatası"
+            : "Bağlı",
+      change: !hasAdminAccess
+        ? "Firestore verileri yönetici oturumu gerektirir"
+        : firestoreError || "Kullanıcı, metin ve modül sorguları başarılı",
       icon: Database,
     },
   ];
@@ -160,7 +208,7 @@ export default function YonetimPaneliPage() {
         </div>
       </div>
 
-      {!authLoading && profile?.role !== "admin" && !isLoading && (
+      {!authLoading && !hasAdminAccess && !isLoading && (
         <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
           Bu paneldeki verileri görüntülemek için yönetici yetkisi gerekir.
         </div>
@@ -193,11 +241,39 @@ export default function YonetimPaneliPage() {
         </div>
       )}
 
+      {hasAdminAccess && missingSeedPassages.length > 0 && (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5">
+            <div>
+              <p className="font-semibold text-charcoal">Örnek metinler Firestore’da kayıtlı değil</p>
+              <p className="text-sm text-charcoal-muted">
+                İçerik ekranında gösterilen {missingSeedPassages.length} yerleşik metni veritabanına ekleyin.
+              </p>
+              {seedMessage && (
+                <p role="status" className="mt-2 text-sm text-charcoal">
+                  {seedMessage}
+                </p>
+              )}
+            </div>
+            <Button
+              size="sm"
+              variant="amber"
+              onClick={handleImportSeedPassages}
+              disabled={isSeeding || isLoading}
+            >
+              {isSeeding ? "Aktarılıyor..." : "Örnek metinleri Firestore’a aktar"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Firestore bağlantı kontrolü */}
       <Card className={`border-sage-200 bg-white ${firestoreError ? "border-red-200" : ""}`}>
         <CardHeader>
           <CardTitle className="text-lg font-bold font-serif flex items-center gap-2">
-            {firestoreError ? (
+            {isLoading ? (
+              <Database className="h-5 w-5 text-brand-700" />
+            ) : !hasAdminAccess || firestoreError ? (
               <AlertTriangle className="h-5 w-5 text-red-600" />
             ) : (
               <CheckCircle className="h-5 w-5 text-emerald-600" />
@@ -209,9 +285,13 @@ export default function YonetimPaneliPage() {
           <p>
             {isLoading
               ? "Firestore bağlantısı kontrol ediliyor."
+              : !hasAdminAccess
+                ? "Firestore durumunu görmek için yönetici hesabıyla giriş yapın."
               : firestoreError
                 ? firestoreError
-                : `Firestore bağlantısı başarılı. ${displayedStats.totalUsers} kullanıcı, ${displayedStats.publishedPassages} yayınlanmış metin ve ${displayedStats.activeModules} aktif modül okundu.`}
+                : displayedStats
+                  ? `Firestore bağlantısı başarılı. ${displayedStats.totalUsers} kullanıcı, ${displayedStats.publishedPassages} yayınlanmış metin ve ${displayedStats.activeModules} aktif modül okundu.`
+                  : "Firestore verileri yüklenemedi."}
           </p>
           <p className="text-xs">
             Bu gösterge, yönetici hesabıyla yapılan Firestore okumalarının sonucunu belirtir; güvenlik kurallarının kapsamını değerlendirmez.
