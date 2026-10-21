@@ -57,18 +57,21 @@ function OkumaLaboratuvariContent() {
 
         const list = await fetchPassages();
         const requestedPassageId = activity?.contentConfig.passageId || searchParams.get("passageId");
-        let target: ReadingPassage | null =
-          list.find((passage) => passage.id === requestedPassageId) || list[0] || null;
+        let target: ReadingPassage | null = requestedPassageId
+          ? list.find((passage) => passage.id === requestedPassageId) || null
+          : list[0] || null;
         if (!target && requestedPassageId) {
           target = await fetchPassageById(requestedPassageId);
         }
         if (!active) return;
-        setPassages(list);
-        if (target) {
-          setSelectedPassage(target);
-          const qList = await fetchQuestionsForPassage(target.id);
-          if (active) setQuestions(qList);
+        setPassages(moduleId ? (target ? [target] : []) : list);
+        setSelectedPassage(target);
+        if (!target) {
+          setQuestions([]);
+          return;
         }
+        const qList = await fetchQuestionsForPassage(target.id);
+        if (active) setQuestions(qList);
       } catch (e) {
         console.error("Okuma laboratuvarı içeriği yüklenemedi:", e);
       } finally {

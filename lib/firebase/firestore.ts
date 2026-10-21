@@ -168,14 +168,24 @@ export async function saveExerciseDefinition(definition: ExerciseDefinition): Pr
 
 export async function assignExercisesToModule(
   moduleId: string,
+  readingPassageId: string,
   exerciseTypes: ExerciseKind[],
   exerciseLevels: Partial<Record<ExerciseKind, number[]>>,
   definitions: ExerciseDefinition[]
 ): Promise<void> {
+  if (!readingPassageId) {
+    throw new Error("Modüle yayımlanmış bir okuma metni atanmalıdır.");
+  }
   const moduleRef = doc(db, "learningModules", moduleId);
-  const moduleSnapshot = await getDoc(moduleRef);
+  const [moduleSnapshot, passageSnapshot] = await Promise.all([
+    getDoc(moduleRef),
+    getDoc(doc(db, "readingPassages", readingPassageId)),
+  ]);
   if (!moduleSnapshot.exists()) {
     throw new Error("Seçilen modül bulunamadı.");
+  }
+  if (!passageSnapshot.exists() || passageSnapshot.data().status !== "published") {
+    throw new Error("Modüle yalnızca yayımlanmış bir okuma metni atanabilir.");
   }
 
   const module = { id: moduleSnapshot.id, ...moduleSnapshot.data() } as LearningModule;
@@ -246,6 +256,7 @@ export async function assignExercisesToModule(
     batch.set(doc(db, "activities", id), activity);
   });
   batch.set(moduleRef, {
+    readingPassageId,
     exerciseTypes,
     exerciseLevels: normalizedLevels,
     activityIds: nextActivities.map((activity) => activity.id),

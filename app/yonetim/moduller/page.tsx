@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { db, isFirebaseConfigured } from "@/lib/firebase/client";
 import { saveLearningModuleWithActivities } from "@/lib/firebase/firestore";
 import { fetchPassages } from "@/lib/services/contentService";
-import { DifficultyLevel, EducationLevel, LearningModule, ReadingPassage } from "@/lib/types";
+import { DifficultyLevel, EducationLevel, ExerciseKind, LearningModule, ReadingPassage } from "@/lib/types";
 import { CheckCircle2, Eye, Plus, BookOpen, LoaderCircle } from "lucide-react";
 
 const EDUCATION_LEVELS: { value: EducationLevel; label: string }[] = [
@@ -26,6 +26,13 @@ const DIFFICULTIES: { value: DifficultyLevel; label: string }[] = [
   { value: "intermediate", label: "Orta" },
   { value: "advanced", label: "İleri" },
 ];
+
+const EXERCISE_LABELS: Record<ExerciseKind, string> = {
+  peripheral_vision: "Çevresel görüş",
+  target_scan: "Hedef tarama",
+  eye_saccade: "Göz sıçraması",
+  flash_words: "Flaş kelime",
+};
 
 export default function ModuleManagementPage() {
   const { profile, loading: authLoading } = useAuth();
@@ -146,7 +153,7 @@ export default function ModuleManagementPage() {
     try {
       await saveLearningModuleWithActivities(module, []);
       setModules((current) => [...current, module].sort((left, right) => left.order - right.order));
-      setSuccess("Modül kaydedildi. Egzersiz seçimi sayfasından beş seviyeli egzersizleri atayın.");
+      setSuccess("Modül kaydedildi. İçerik ve egzersizleri düzenle sayfasından okuma metnini ve seviyeleri seçin.");
       setFormOpen(false);
       resetForm();
     } catch (saveError) {
@@ -310,11 +317,21 @@ export default function ModuleManagementPage() {
                   {module.educationLevel ? ` · ${EDUCATION_LEVELS.find((level) => level.value === module.educationLevel)?.label}` : ""}
                   {` · ${module.estimatedDuration} dk · Sıra ${module.order}`}
                 </p>
+                <p className="mt-2 text-xs text-charcoal-muted">
+                  Okuma metni: {passages.find((passage) => passage.id === module.readingPassageId)?.title || "Henüz atanmamış"}
+                </p>
+                <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-charcoal-muted">
+                  {module.exerciseTypes?.length ? module.exerciseTypes.map((kind) => (
+                    <li key={kind}>
+                      {EXERCISE_LABELS[kind]}: Seviye {(module.exerciseLevels?.[kind] || []).join(", ") || "atanmamış"}
+                    </li>
+                  )) : <li>Henüz egzersiz atanmamış</li>}
+                </ul>
               </div>
               <div className="flex shrink-0 flex-col items-start gap-2 text-xs text-charcoal-muted sm:items-end">
                 <span>{module.exerciseTypes?.length || 0} egzersiz türü atanmış</span>
                 <Link href={`/yonetim/moduller/egzersiz-sec?moduleId=${encodeURIComponent(module.id)}`}>
-                  <Button size="sm" variant="outline"><Eye className="mr-1.5 h-4 w-4" />Egzersizleri seç</Button>
+                  <Button size="sm" variant="outline"><Eye className="mr-1.5 h-4 w-4" />İçerik ve egzersizleri düzenle</Button>
                 </Link>
               </div>
             </CardContent>

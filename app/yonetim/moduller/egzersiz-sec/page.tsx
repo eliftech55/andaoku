@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { assignExercisesToModule, getExerciseDefinitions } from "@/lib/firebase/firestore";
 import { getLearningModules } from "@/lib/firebase/firestore";
-import { ExerciseDefinition, ExerciseKind, LearningModule } from "@/lib/types";
+import { fetchPassages } from "@/lib/services/contentService";
+import { ExerciseDefinition, ExerciseKind, LearningModule, ReadingPassage } from "@/lib/types";
 import { CheckCircle2, Eye, BookOpen, LoaderCircle } from "lucide-react";
 
 const KIND_ORDER: ExerciseKind[] = [
@@ -45,7 +46,9 @@ function SelectModuleExercisesContent() {
   const { profile, loading: authLoading } = useAuth();
   const [modules, setModules] = useState<LearningModule[]>([]);
   const [definitions, setDefinitions] = useState<ExerciseDefinition[]>([]);
+  const [passages, setPassages] = useState<ReadingPassage[]>([]);
   const [selectedModuleId, setSelectedModuleId] = useState("");
+  const [selectedPassageId, setSelectedPassageId] = useState("");
   const [selectedKinds, setSelectedKinds] = useState<ExerciseKind[]>([]);
   const [selectedLevels, setSelectedLevels] = useState<Partial<Record<ExerciseKind, number[]>>>({});
   const [loading, setLoading] = useState(true);
@@ -61,18 +64,26 @@ function SelectModuleExercisesContent() {
     let active = true;
     async function load() {
       try {
-        const [moduleList, exerciseDefinitions] = await Promise.all([
+        const [moduleList, exerciseDefinitions, passageList] = await Promise.all([
           getLearningModules(),
           getExerciseDefinitions(),
+          fetchPassages(),
         ]);
         if (!active) return;
         setModules(moduleList);
         setDefinitions(exerciseDefinitions);
+        const publishedPassages = passageList.filter((passage) => passage.status === "published");
+        setPassages(publishedPassages);
         const requestedModuleId = searchParams.get("moduleId");
         const initialModuleId =
           moduleList.find((module) => module.id === requestedModuleId)?.id || moduleList[0]?.id || "";
         setSelectedModuleId(initialModuleId);
         const initialModule = moduleList.find((module) => module.id === initialModuleId);
+        setSelectedPassageId(
+          publishedPassages.some((passage) => passage.id === initialModule?.readingPassageId)
+            ? initialModule?.readingPassageId || ""
+            : publishedPassages[0]?.id || ""
+        );
         setSelectedKinds(initialModule?.exerciseTypes || []);
         setSelectedLevels(getInitialExerciseLevels(initialModule));
       } catch (loadError) {
@@ -93,6 +104,11 @@ function SelectModuleExercisesContent() {
   const handleModuleChange = (moduleId: string) => {
     setSelectedModuleId(moduleId);
     const module = modules.find((item) => item.id === moduleId);
+    setSelectedPassageId(
+      passages.some((passage) => passage.id === module?.readingPassageId)
+        ? module?.readingPassageId || ""
+        : passages[0]?.id || ""
+    );
     setSelectedKinds(module?.exerciseTypes || []);
     setSelectedLevels(getInitialExerciseLevels(module));
     setSuccess(null);
@@ -132,17 +148,33 @@ function SelectModuleExercisesContent() {
     setError(null);
     setSuccess(null);
     try {
-      await assignExercisesToModule(selectedModuleId, selectedKinds, selectedLevels, definitions);
+      if (!passages.some((passage) => passage.id === selectedPassageId)) {
+        setError("Modüle atanacak yayımlanmış bir okuma metni seçin.");
+        setSaving(false);
+        return;
+      }
+      await assignExercisesToModule(
+        selectedModuleId,
+        selectedPassageId,
+        selectedKinds,
+        selectedLevels,
+        definitions
+      );
       const selectedModule = modules.find((module) => module.id === selectedModuleId);
       setModules((current) =>
         current.map((module) =>
           module.id === selectedModuleId
-            ? { ...module, exerciseTypes: selectedKinds, exerciseLevels: selectedLevels }
+            ? {
+                ...module,
+                readingPassageId: selectedPassageId,
+                exerciseTypes: selectedKinds,
+                exerciseLevels: selectedLevels,
+              }
             : module
         )
       );
       setSuccess(
-        `${selectedModule?.title || "Modül"} için seçilen egzersiz seviyeleri bağlandı. Modül başarısı okuma ve egzersiz puanlarının ortalamasında en az %70 gerektirir.`
+        `${selectedModule?.title || "Modül"} için okuma metni ve egzersiz seviyeleri kaydedildi.`
       );
     } catch (saveError) {
       console.error("Modül egzersizleri kaydedilemedi:", saveError);
@@ -167,8 +199,8 @@ function SelectModuleExercisesContent() {
     <div className="container mx-auto max-w-4xl space-y-8 px-4 py-10 sm:px-6 lg:px-8">
       <header className="space-y-2 border-b border-sage-200 pb-4">
         <Badge variant="amber">Müfredat Düzenleme</Badge>
-        <h1 className="text-3xl font-extrabold font-serif text-charcoal">Modüle Egzersiz Seç</h1>
-        <p className="text-sm text-charcoal-muted">Modüle atanacak egzersiz türlerini ve seviyelerini seçin. Seviye seçimi 1’den başlayarak kesintisiz olmalıdır; sonraki seviye bir önceki seviyede %70 alınca açılır.</p>
+        <h1 className="text-3xl font-extrabold font-serif text-charcoal">Modül İçeriği ve Egzersizleri</h1>
+        <p className="text-sm text-charcoal-muted">Modülde çalışılacak okuma metnini, egzersiz türlerini ve seviyelerini birlikte seçin. Seviye seçimi 1’den başlayarak kesintisiz olmalıdır; sonraki seviye bir önceki seviyede %70 alınca açılır.</p>
       </header>
 
       {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">{error}</p>}
@@ -194,6 +226,24 @@ function SelectModuleExercisesContent() {
             <p className="text-sm text-charcoal-muted">Henüz modül yok. Önce modül yönetiminden modül oluşturun.</p>
           ) : (
             <>
+              <label className="block space-y-1 text-sm font-medium">
+                Modül okuma metni
+                <select
+                  value={selectedPassageId}
+                  onChange={(event) => setSelectedPassageId(event.target.value)}
+                  disabled={passages.length === 0}
+                  className="w-full rounded-xl border border-sage-200 bg-white p-2.5"
+                >
+                  {passages.map((passage) => (
+                    <option key={passage.id} value={passage.id}>{passage.title}</option>
+                  ))}
+                </select>
+                {passages.length === 0 && (
+                  <span className="block text-xs text-red-700">
+                    Yayımlanmış okuma metni yok. Önce içerik yönetiminden bir metin yayımlayın.
+                  </span>
+                )}
+              </label>
               <fieldset className="grid gap-3 sm:grid-cols-2">
                 <legend className="mb-2 text-sm font-semibold">Modüle atanacak egzersiz türleri</legend>
                 {KIND_ORDER.map((kind) => {
@@ -261,7 +311,7 @@ function SelectModuleExercisesContent() {
                 {selectedModule?.activityIds?.length ? <p className="mt-2">Bu modülde şu anda {selectedModule.activityIds.length} seviye etkinliği var; kaydetmek mevcut atamayı günceller.</p> : null}
               </div>
               <div className="flex justify-end">
-                <Button variant="amber" onClick={handleSave} disabled={saving || !catalogReady}>
+                <Button variant="amber" onClick={handleSave} disabled={saving || !catalogReady || !selectedPassageId}>
                   {saving ? <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" />Kaydediliyor</> : "Seçimleri modüle kaydet"}
                 </Button>
               </div>

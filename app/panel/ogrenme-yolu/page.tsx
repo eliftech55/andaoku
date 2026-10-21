@@ -23,14 +23,22 @@ import {
   Award,
   Eye,
 } from "lucide-react";
-import { fetchActivities, fetchAllModules } from "@/lib/services/contentService";
+import { fetchActivities, fetchAllModules, fetchPassages } from "@/lib/services/contentService";
 import { getUserProgressList } from "@/lib/firebase/firestore";
-import type { Activity as LearningActivity, LearningModule, UserProgress } from "@/lib/types";
+import type { Activity as LearningActivity, ExerciseKind, LearningModule, ReadingPassage, UserProgress } from "@/lib/types";
+
+const EXERCISE_LABELS: Record<ExerciseKind, string> = {
+  peripheral_vision: "Çevresel görüş",
+  target_scan: "Hedef tarama",
+  eye_saccade: "Göz sıçraması",
+  flash_words: "Flaş kelime",
+};
 
 export default function OgrenmeYoluPage() {
   const { user, profile } = useAuth();
   const [modules, setModules] = useState<LearningModule[]>([]);
   const [activities, setActivities] = useState<LearningActivity[]>([]);
+  const [passages, setPassages] = useState<ReadingPassage[]>([]);
   const [progressList, setProgressList] = useState<UserProgress[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -38,14 +46,16 @@ export default function OgrenmeYoluPage() {
     async function loadData() {
       const uid = user?.uid || profile?.uid || "demo-learner-123";
       try {
-        const [mods, progs, activityList] = await Promise.all([
+        const [mods, progs, activityList, passageList] = await Promise.all([
           fetchAllModules(),
           getUserProgressList(uid),
           fetchActivities(),
+          fetchPassages(),
         ]);
         setModules(mods);
         setProgressList(progs);
         setActivities(activityList);
+        setPassages(passageList);
       } catch (e) {
         console.error(e);
       } finally {
@@ -139,6 +149,21 @@ export default function OgrenmeYoluPage() {
               ["visual_attention", "fluency", "chunk_reading", "assessment"].includes(activity.type) &&
               !activity.level
           );
+          const assignedExerciseActivities = activities.filter((activity) => {
+            if (
+              activity.moduleId !== mod.id ||
+              !activity.level ||
+              !mod.exerciseTypes?.includes(activity.type as ExerciseKind)
+            ) {
+              return false;
+            }
+            const selectedLevels = mod.exerciseLevels?.[activity.type as ExerciseKind] || [1, 2, 3, 4, 5];
+            return (
+              selectedLevels.includes(activity.level) &&
+              (mod.activityIds?.includes(activity.id) ?? true)
+            );
+          });
+          const modulePassage = passages.find((passage) => passage.id === mod.readingPassageId);
           const moduleProgress = progressList.find((progress) => progress.moduleId === mod.id);
 
           return (
@@ -198,6 +223,42 @@ export default function OgrenmeYoluPage() {
                   <p className="text-xs sm:text-sm text-charcoal-muted leading-relaxed">
                     {mod.description}
                   </p>
+
+                  <div className="grid gap-3 rounded-xl border border-sage-200 bg-ivory-warm/60 p-4 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <p className="flex items-center gap-1.5 text-xs font-bold text-charcoal">
+                        <BookOpenCheck className="h-3.5 w-3.5 text-brand-700" />
+                        Okuma metni
+                      </p>
+                      <p className="text-sm text-charcoal-muted">
+                        {modulePassage?.title || (mod.readingPassageId ? "Atanan metin yüklenemedi" : "Henüz metin atanmamış")}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="flex items-center gap-1.5 text-xs font-bold text-charcoal">
+                        <Eye className="h-3.5 w-3.5 text-amber-700" />
+                        Egzersizler ve seviyeler
+                      </p>
+                      {mod.exerciseTypes?.length ? (
+                        <ul className="space-y-1 text-xs text-charcoal-muted">
+                          {mod.exerciseTypes.map((kind) => {
+                            const levels = assignedExerciseActivities
+                              .filter((activity) => activity.type === kind)
+                              .map((activity) => activity.level)
+                              .filter((level): level is number => level !== undefined)
+                              .sort((left, right) => left - right);
+                            return (
+                              <li key={kind}>
+                                {EXERCISE_LABELS[kind]}: {levels.length ? `Seviye ${levels.join(", ")}` : "Etkinlik bekleniyor"}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      ) : (
+                        <p className="text-xs text-charcoal-muted">Bu modüle henüz egzersiz atanmamış.</p>
+                      )}
+                    </div>
+                  </div>
 
                   <div className="flex flex-wrap gap-1.5 pt-1">
                     {mod.targetSkills.map((skill, sIdx) => (
