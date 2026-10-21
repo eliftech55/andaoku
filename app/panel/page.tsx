@@ -218,18 +218,22 @@ export default function UserDashboardPage() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold font-serif text-charcoal">Kişisel Öğrenme Yolunuz</h2>
-          <Link href="/panel/ogrenme-yolu" className="text-xs font-semibold text-brand-800 hover:underline flex items-center gap-1">
-            Tüm Modül Haritasını Aç
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
+          <div className="flex flex-wrap items-center gap-3">
+            <Link href="/panel/egzersizler" className="text-xs font-semibold text-brand-800 hover:underline flex items-center gap-1">
+              Egzersizlerim <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+            <Link href="/panel/ogrenme-yolu" className="text-xs font-semibold text-brand-800 hover:underline flex items-center gap-1">
+              Tüm Modül Haritasını Aç <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
         </div>
 
         <div className="p-6 rounded-3xl bg-white border border-sage-200 shadow-sm space-y-4">
           <div className="flex items-center justify-between text-xs text-charcoal-muted">
             <span>Genel Yol İlerlemesi</span>
-            <span className="font-bold text-brand-900">%{Math.round((completedModulesCount / 10) * 100)}</span>
+            <span className="font-bold text-brand-900">%{totalModules ? Math.round((completedModulesCount / totalModules) * 100) : 0}</span>
           </div>
-          <Progress value={(completedModulesCount / 10) * 100} />
+          <Progress value={totalModules ? (completedModulesCount / totalModules) * 100 : 0} />
 
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2">
             {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => {

@@ -16,7 +16,11 @@ export type AssessmentType = "pretest" | "interim" | "posttest" | "followup" | "
 export type ActivityType =
   | "assessment"
   | "visual_attention"
+  | "peripheral_vision"
+  | "target_scan"
+  | "eye_saccade"
   | "word_recognition"
+  | "flash_words"
   | "chunk_reading"
   | "fluency"
   | "skimming"
@@ -74,6 +78,10 @@ export interface LearningModule {
   targetSkills: string[];
   difficulty: DifficultyLevel;
   educationLevel?: EducationLevel;
+  readingPassageId?: string;
+  exerciseTypes?: ExerciseKind[];
+  activityIds?: string[];
+  requiredCompletionScore?: number;
   order: number;
   prerequisites: string[]; // module IDs
   estimatedDuration: number; // minutes
@@ -107,6 +115,7 @@ export interface Activity {
   moduleId: string;
   title: string;
   type: ActivityType;
+  level?: number;
   description: string;
   targetSkills: string[];
   difficulty: DifficultyLevel;
@@ -119,6 +128,10 @@ export interface Activity {
     symbolGrid?: string[][];
     targetSymbol?: string;
     gridSize?: number;
+    targetCount?: number;
+    sequenceLength?: number;
+    flashDurationMs?: number;
+    exerciseKind?: ExerciseKind;
     targetKeywords?: string[];
     chunkSize?: number; // words per chunk (e.g. 2, 3, 4)
     speedPacingWpm?: number;
@@ -136,6 +149,46 @@ export interface Activity {
   status: ContentStatus;
   createdAt: string;
   updatedAt: string;
+}
+
+export type ExerciseKind =
+  | "peripheral_vision"
+  | "target_scan"
+  | "eye_saccade"
+  | "flash_words";
+
+export interface ExerciseDefinition {
+  id: string;
+  kind: ExerciseKind;
+  level: 1 | 2 | 3 | 4 | 5;
+  title: string;
+  description: string;
+  instructions: string;
+  config: {
+    gridSize?: number;
+    targetCount?: number;
+    timeLimitSeconds?: number;
+    sequenceLength?: number;
+    flashDurationMs?: number;
+    targetSymbol?: string;
+  };
+  status: ContentStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExerciseAttempt {
+  id: string;
+  userId: string;
+  moduleId: string;
+  activityId: string;
+  exerciseKind: ExerciseKind;
+  level: number;
+  score: number;
+  correctCount: number;
+  totalCount: number;
+  durationSeconds: number;
+  createdAt: string;
 }
 
 export interface ReadingSession {
@@ -180,6 +233,10 @@ export interface UserProgress {
   status: "not_started" | "in_progress" | "completed";
   completionPercentage: number;
   attemptCount: number;
+  readingScore?: number;
+  exerciseScore?: number;
+  overallScore?: number;
+  bestExerciseScores?: Record<string, number>;
   bestResult?: {
     wpm: number;
     comprehensionScore: number;

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
 import { collection, getDocs, orderBy, query } from "firebase/firestore";
 import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
@@ -9,13 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { db, isFirebaseConfigured } from "@/lib/firebase/client";
 import { saveLearningModuleWithActivities } from "@/lib/firebase/firestore";
 import { fetchPassages } from "@/lib/services/contentService";
-import {
-  Activity,
-  DifficultyLevel,
-  EducationLevel,
-  LearningModule,
-  ReadingPassage,
-} from "@/lib/types";
+import { DifficultyLevel, EducationLevel, LearningModule, ReadingPassage } from "@/lib/types";
 import { CheckCircle2, Eye, Plus, BookOpen, LoaderCircle } from "lucide-react";
 
 const EDUCATION_LEVELS: { value: EducationLevel; label: string }[] = [
@@ -31,15 +26,6 @@ const DIFFICULTIES: { value: DifficultyLevel; label: string }[] = [
   { value: "intermediate", label: "Orta" },
   { value: "advanced", label: "İleri" },
 ];
-
-const LEVEL_SETTINGS: Record<
-  DifficultyLevel,
-  { gridSize: number; visualSeconds: number; readingWpm: number; chunkSize: number; minWpm: number }
-> = {
-  beginner: { gridSize: 4, visualSeconds: 45, readingWpm: 150, chunkSize: 1, minWpm: 100 },
-  intermediate: { gridSize: 5, visualSeconds: 35, readingWpm: 220, chunkSize: 2, minWpm: 180 },
-  advanced: { gridSize: 6, visualSeconds: 25, readingWpm: 280, chunkSize: 3, minWpm: 250 },
-};
 
 export default function ModuleManagementPage() {
   const { profile, loading: authLoading } = useAuth();
@@ -131,7 +117,6 @@ export default function ModuleManagementPage() {
 
     const now = new Date().toISOString();
     const id = `modul-${crypto.randomUUID()}`;
-    const levelSettings = LEVEL_SETTINGS[difficulty];
     const skills = targetSkills
       .split(",")
       .map((skill) => skill.trim())
@@ -143,6 +128,10 @@ export default function ModuleManagementPage() {
       targetSkills: skills.length ? skills : ["hizli_okuma", "goz_tarama", "anlama"],
       difficulty,
       educationLevel,
+      readingPassageId: passageId,
+      exerciseTypes: [],
+      activityIds: [],
+      requiredCompletionScore: 70,
       order: Math.max(0, ...modules.map((item) => item.order)) + 1,
       prerequisites,
       estimatedDuration: duration,
@@ -151,58 +140,13 @@ export default function ModuleManagementPage() {
       updatedAt: now,
     };
 
-    const exercises: Activity[] = [
-      {
-        id: `${id}-goz-egzersizi`,
-        moduleId: id,
-        title: "Görsel Tarama ve Odaklanma",
-        type: "visual_attention",
-        description: `${DIFFICULTIES.find((level) => level.value === difficulty)?.label} seviyede hedef sembolü tarama çalışması.`,
-        targetSkills: ["gorsel_tarama", "odaklanma"],
-        difficulty,
-        ageGroups: ["all"],
-        educationLevels: [educationLevel],
-        instructions: "Hedef sembolleri satır satır tarayın ve süre bitmeden seçin.",
-        contentConfig: {
-          targetSymbol: "★",
-          gridSize: levelSettings.gridSize,
-          timeLimitSeconds: levelSettings.visualSeconds,
-        },
-        completionRules: { requiredAccuracy: difficulty === "beginner" ? 65 : difficulty === "intermediate" ? 80 : 90 },
-        status,
-        createdAt: now,
-        updatedAt: now,
-      },
-      {
-        id: `${id}-okuma-egzersizi`,
-        moduleId: id,
-        title: "Akıcı Okuma ve Anlama",
-        type: difficulty === "beginner" ? "fluency" : "chunk_reading",
-        description: `${DIFFICULTIES.find((level) => level.value === difficulty)?.label} seviyeye uygun tempo ve kelime gruplarıyla okuma çalışması.`,
-        targetSkills: ["akici_okuma", "okudugunu_anlama"],
-        difficulty,
-        ageGroups: ["all"],
-        educationLevels: [educationLevel],
-        instructions: "Metni belirlenen tempoda okuyun; anlamı korumaya ve kelime gruplarını takip etmeye çalışın.",
-        contentConfig: {
-          passageId,
-          chunkSize: levelSettings.chunkSize,
-          speedPacingWpm: levelSettings.readingWpm,
-        },
-        completionRules: { minWpm: levelSettings.minWpm, minComprehensionScore: 60 },
-        status,
-        createdAt: now,
-        updatedAt: now,
-      },
-    ];
-
     setIsSaving(true);
     setError(null);
     setSuccess(null);
     try {
-      await saveLearningModuleWithActivities(module, exercises);
+      await saveLearningModuleWithActivities(module, []);
       setModules((current) => [...current, module].sort((left, right) => left.order - right.order));
-      setSuccess("Modül ve seviyesine uygun göz/okuma egzersizleri birlikte kaydedildi.");
+      setSuccess("Modül kaydedildi. Egzersiz seçimi sayfasından beş seviyeli egzersizleri atayın.");
       setFormOpen(false);
       resetForm();
     } catch (saveError) {
@@ -234,7 +178,7 @@ export default function ModuleManagementPage() {
           <Badge variant="amber" className="mb-1">Eğitsel İçerik</Badge>
           <h1 className="text-3xl font-extrabold font-serif text-charcoal">Modül Yönetimi</h1>
           <p className="text-sm text-charcoal-muted">
-            Her modül için göz tarama ve seviyeye uygun akıcı okuma egzersizleri birlikte oluşturulur.
+            Modülleri oluşturun, okuma metinlerini ve beş seviyeli egzersizleri ayrı seçim ekranında atayın.
           </p>
         </div>
         <Button
@@ -250,6 +194,14 @@ export default function ModuleManagementPage() {
           {formOpen ? "Formu Kapat" : "Yeni Modül Ekle"}
         </Button>
       </header>
+      <div className="flex flex-wrap gap-2">
+        <Link href="/yonetim/egzersizler">
+          <Button size="sm" variant="outline"><Eye className="mr-1.5 h-4 w-4" />Egzersiz kataloğunu yönet</Button>
+        </Link>
+        <Link href="/yonetim/moduller/egzersiz-sec">
+          <Button size="sm" variant="outline"><BookOpen className="mr-1.5 h-4 w-4" />Modüllere egzersiz seç</Button>
+        </Link>
+      </div>
 
       {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">{error}</p>}
       {success && (
@@ -262,9 +214,7 @@ export default function ModuleManagementPage() {
         <Card className="border-amber-200">
           <CardHeader>
             <CardTitle className="font-serif">Yeni öğrenme modülü</CardTitle>
-            <p className="text-sm text-charcoal-muted">
-              Seçtiğiniz seviyeye göre görsel tarama süresi/ızgarası ve okuma temposu otomatik ayarlanır.
-            </p>
+            <p className="text-sm text-charcoal-muted">Modül için bir okuma metni belirleyin. Egzersiz türlerini ve seviyelerini sonraki seçim adımında atayın.</p>
           </CardHeader>
           <CardContent>
             <form className="space-y-5" onSubmit={handleSave}>
@@ -327,16 +277,13 @@ export default function ModuleManagementPage() {
                 </fieldset>
               )}
               <div className="rounded-xl bg-ivory-warm p-4 text-sm text-charcoal-muted">
-                <p className="mb-2 font-semibold text-charcoal">Otomatik eklenecek egzersizler</p>
-                <div className="flex flex-wrap gap-4">
-                  <span className="flex items-center gap-1.5"><Eye className="h-4 w-4 text-brand-700" /> Görsel tarama: {LEVEL_SETTINGS[difficulty].gridSize}×{LEVEL_SETTINGS[difficulty].gridSize}, {LEVEL_SETTINGS[difficulty].visualSeconds} sn</span>
-                  <span className="flex items-center gap-1.5"><BookOpen className="h-4 w-4 text-amber-700" /> Okuma: hedef {LEVEL_SETTINGS[difficulty].readingWpm} kelime/dk</span>
-                </div>
+                <p className="font-semibold text-charcoal">Modül geçiş koşulu</p>
+                <p>Okuma anlama puanı ve atanan egzersiz puanları ortalaması en az %70 olmalıdır.</p>
               </div>
               <div className="flex justify-end gap-2">
                 <Button type="button" size="sm" variant="outline" onClick={() => setFormOpen(false)}>İptal</Button>
                 <Button type="submit" size="sm" variant="amber" disabled={isSaving || passages.length === 0}>
-                  {isSaving ? <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" />Kaydediliyor</> : "Modülü ve egzersizleri kaydet"}
+                  {isSaving ? <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" />Kaydediliyor</> : "Modülü kaydet"}
                 </Button>
               </div>
               {passages.length === 0 && <p className="text-sm text-red-700">Yayınlanmış okuma metni bulunamadı; önce içerik yönetiminden metin ekleyin.</p>}
@@ -364,9 +311,11 @@ export default function ModuleManagementPage() {
                   {` · ${module.estimatedDuration} dk · Sıra ${module.order}`}
                 </p>
               </div>
-              <div className="flex shrink-0 gap-3 text-xs text-charcoal-muted">
-                <span className="flex items-center gap-1"><Eye className="h-4 w-4" /> Göz egzersizi</span>
-                <span className="flex items-center gap-1"><BookOpen className="h-4 w-4" /> Okuma egzersizi</span>
+              <div className="flex shrink-0 flex-col items-start gap-2 text-xs text-charcoal-muted sm:items-end">
+                <span>{module.exerciseTypes?.length || 0} egzersiz türü atanmış</span>
+                <Link href={`/yonetim/moduller/egzersiz-sec?moduleId=${encodeURIComponent(module.id)}`}>
+                  <Button size="sm" variant="outline"><Eye className="mr-1.5 h-4 w-4" />Egzersizleri seç</Button>
+                </Link>
               </div>
             </CardContent>
           </Card>

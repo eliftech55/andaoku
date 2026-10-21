@@ -10,6 +10,7 @@ import { collection, doc, getDoc, getDocs, setDoc } from "firebase/firestore";
 import { db, isFirebaseConfigured } from "@/lib/firebase/client";
 import { SEED_PASSAGES } from "@/lib/services/seedData";
 import {
+  Activity,
   Users,
   FileText,
   Layers,
@@ -198,6 +199,11 @@ export default function YonetimPaneliPage() {
           <Link href="/yonetim/moduller">
             <Button size="sm" variant="amber">
               <Layers className="mr-1.5 h-4 w-4" /> Modül Yönetimi
+            </Button>
+          </Link>
+          <Link href="/yonetim/egzersizler">
+            <Button size="sm" variant="outline">
+              <Activity className="mr-1.5 h-4 w-4" /> Egzersiz Yönetimi
             </Button>
           </Link>
           <Link href="/yonetim/icerik">

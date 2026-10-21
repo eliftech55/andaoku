@@ -28,7 +28,12 @@ import {
   AuditLog,
   EducationLevel,
   DifficultyLevel,
+  ExerciseAttempt,
+  ExerciseDefinition,
+  ExerciseKind,
 } from "../types";
+import { BUILT_IN_EXERCISE_DEFINITIONS } from "../services/exerciseCatalog";
+import { calculateModuleScore } from "../services/moduleScoring";
 
 // ==========================================
 // 1. OKUMA METİNLERİ (readingPassages)
@@ -129,6 +134,106 @@ export async function saveLearningModuleWithActivities(
     batch.set(doc(db, "activities", id), activityData);
   });
 
+  await batch.commit();
+}
+
+export async function getExerciseDefinitions(): Promise<ExerciseDefinition[]> {
+  const snapshot = await getDocs(collection(db, "exerciseDefinitions"));
+  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as ExerciseDefinition);
+}
+
+export async function initializeExerciseCatalog(): Promise<void> {
+  const definitionsRef = collection(db, "exerciseDefinitions");
+  const existing = await getDocs(definitionsRef);
+  const existingIds = new Set(existing.docs.map((item) => item.id));
+  const missingDefinitions = BUILT_IN_EXERCISE_DEFINITIONS.filter(
+    (definition) => !existingIds.has(definition.id)
+  );
+  if (missingDefinitions.length === 0) return;
+
+  const batch = writeBatch(db);
+  missingDefinitions.forEach(({ id, ...definition }) => {
+    batch.set(doc(db, "exerciseDefinitions", id), definition);
+  });
+  await batch.commit();
+}
+
+export async function saveExerciseDefinition(definition: ExerciseDefinition): Promise<void> {
+  const { id, ...data } = definition;
+  await setDoc(doc(db, "exerciseDefinitions", id), {
+    ...data,
+    updatedAt: new Date().toISOString(),
+  }, { merge: true });
+}
+
+export async function assignExercisesToModule(
+  moduleId: string,
+  exerciseTypes: ExerciseKind[],
+  definitions: ExerciseDefinition[]
+): Promise<void> {
+  const moduleRef = doc(db, "learningModules", moduleId);
+  const moduleSnapshot = await getDoc(moduleRef);
+  if (!moduleSnapshot.exists()) {
+    throw new Error("Seçilen modül bulunamadı.");
+  }
+
+  const module = { id: moduleSnapshot.id, ...moduleSnapshot.data() } as LearningModule;
+  const assignedDefinitions = definitions.filter(
+    (definition) => exerciseTypes.includes(definition.kind) && definition.status === "published"
+  );
+  const expectedDefinitionCount = exerciseTypes.length * 5;
+  if (assignedDefinitions.length !== expectedDefinitionCount) {
+    throw new Error("Her seçili egzersiz türü için yayımlanmış beş seviye bulunmalıdır.");
+  }
+
+  const nextActivities: Activity[] = assignedDefinitions.map((definition) => {
+    const activityId = `${moduleId}-${definition.id}`;
+    const levelDifficulty: DifficultyLevel =
+      definition.level <= 2 ? "beginner" : definition.level === 3 ? "intermediate" : "advanced";
+    return {
+      id: activityId,
+      moduleId,
+      title: definition.title,
+      type: definition.kind,
+      level: definition.level,
+      description: definition.description,
+      targetSkills: [definition.kind, "gorsel_dikkat"],
+      difficulty: levelDifficulty,
+      ageGroups: ["all"],
+      educationLevels: module.educationLevel
+        ? [module.educationLevel]
+        : ["primary", "middle", "high", "university", "adult"],
+      instructions: definition.instructions,
+      contentConfig: {
+        ...definition.config,
+        exerciseKind: definition.kind,
+        ...(definition.kind === "flash_words"
+          ? { wordList: ["okuma", "dikkat", "bilgi", "anlam", "kitap", "öğrenme", "tarama", "odak"] }
+          : {}),
+      },
+      completionRules: { requiredAccuracy: 70 },
+      status: module.status,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  });
+
+  const batch = writeBatch(db);
+  const previousActivityIds = (module.activityIds || []) as string[];
+  previousActivityIds.forEach((activityId) => {
+    if (!nextActivities.some((activity) => activity.id === activityId)) {
+      batch.set(doc(db, "activities", activityId), { status: "archived", updatedAt: new Date().toISOString() }, { merge: true });
+    }
+  });
+  nextActivities.forEach(({ id, ...activity }) => {
+    batch.set(doc(db, "activities", id), activity);
+  });
+  batch.set(moduleRef, {
+    exerciseTypes,
+    activityIds: nextActivities.map((activity) => activity.id),
+    requiredCompletionScore: 70,
+    updatedAt: new Date().toISOString(),
+  }, { merge: true });
   await batch.commit();
 }
 
@@ -269,6 +374,108 @@ export async function getUserProgressList(userId: string): Promise<UserProgress[
     console.error("İlerleme getirme hatası:", error);
     return [];
   }
+}
+
+export async function getUserExerciseAttempts(userId: string): Promise<ExerciseAttempt[]> {
+  const snapshot = await getDocs(
+    query(collection(db, "exerciseAttempts"), where("userId", "==", userId))
+  );
+  return snapshot.docs
+    .map((item) => ({ id: item.id, ...item.data() }) as ExerciseAttempt)
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+}
+
+export async function saveExerciseAttempt(
+  attempt: Omit<ExerciseAttempt, "id">
+): Promise<ExerciseAttempt> {
+  const attemptRef = doc(collection(db, "exerciseAttempts"));
+  await setDoc(attemptRef, attempt);
+
+  try {
+    const [moduleSnapshot, progressSnapshot, attempts] = await Promise.all([
+      getDoc(doc(db, "learningModules", attempt.moduleId)),
+      getDoc(doc(db, "userProgress", `${attempt.userId}_${attempt.moduleId}`)),
+      getUserExerciseAttempts(attempt.userId),
+    ]);
+    const module = moduleSnapshot.exists()
+      ? ({ id: moduleSnapshot.id, ...moduleSnapshot.data() } as LearningModule)
+      : null;
+    const existingProgress = progressSnapshot.exists()
+      ? (progressSnapshot.data() as UserProgress)
+      : null;
+    const bestExerciseScores = { ...(existingProgress?.bestExerciseScores || {}) };
+
+    for (const item of attempts) {
+      if (item.moduleId !== attempt.moduleId) continue;
+      bestExerciseScores[item.exerciseKind] = Math.max(
+        bestExerciseScores[item.exerciseKind] || 0,
+        item.score
+      );
+    }
+
+    const score = calculateModuleScore({
+      readingScore: existingProgress?.readingScore,
+      exerciseTypes: module?.exerciseTypes || [],
+      bestExerciseScores,
+    });
+    const now = new Date().toISOString();
+    await setDoc(doc(db, "userProgress", `${attempt.userId}_${attempt.moduleId}`), {
+      userId: attempt.userId,
+      moduleId: attempt.moduleId,
+      activityId: attempt.activityId,
+      status: score.isComplete ? "completed" : "in_progress",
+      completionPercentage: score.overallScore ?? score.exerciseScore,
+      attemptCount: (existingProgress?.attemptCount || 0) + 1,
+      exerciseScore: score.exerciseScore,
+      overallScore: score.overallScore,
+      bestExerciseScores,
+      lastActivityAt: now,
+      updatedAt: now,
+    }, { merge: true });
+  } catch (error) {
+    console.error("Egzersiz kaydedildi ancak modül ilerlemesi güncellenemedi:", error);
+    throw error;
+  }
+
+  return { id: attemptRef.id, ...attempt };
+}
+
+export async function saveModuleReadingScore(
+  userId: string,
+  moduleId: string,
+  readingScore: number
+): Promise<void> {
+  const [moduleSnapshot, progressSnapshot] = await Promise.all([
+    getDoc(doc(db, "learningModules", moduleId)),
+    getDoc(doc(db, "userProgress", `${userId}_${moduleId}`)),
+  ]);
+  const module = moduleSnapshot.exists()
+    ? ({ id: moduleSnapshot.id, ...moduleSnapshot.data() } as LearningModule)
+    : null;
+  const existingProgress = progressSnapshot.exists()
+    ? (progressSnapshot.data() as UserProgress)
+    : null;
+  const bestReadingScore = Math.max(existingProgress?.readingScore || 0, readingScore);
+  const bestExerciseScores = existingProgress?.bestExerciseScores || {};
+  const score = calculateModuleScore({
+    readingScore: bestReadingScore,
+    exerciseTypes: module?.exerciseTypes || [],
+    bestExerciseScores,
+  });
+  const now = new Date().toISOString();
+  await setDoc(doc(db, "userProgress", `${userId}_${moduleId}`), {
+    userId,
+    moduleId,
+    status: score.isComplete ? "completed" : "in_progress",
+    completionPercentage: score.overallScore ?? score.exerciseScore,
+    attemptCount: (existingProgress?.attemptCount || 0) + 1,
+    readingScore: bestReadingScore,
+    exerciseScore: score.exerciseScore,
+    overallScore: score.overallScore,
+    bestExerciseScores,
+    lastActivityAt: now,
+    updatedAt: now,
+  }, { merge: true });
 }
 
 export async function upsertUserProgress(progress: Omit<UserProgress, "id">) {

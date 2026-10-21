@@ -98,8 +98,10 @@ export default function OgrenmeYoluPage() {
           const moduleActivities = activities.filter(
             (activity) =>
               activity.moduleId === mod.id &&
-              ["visual_attention", "fluency", "chunk_reading", "assessment"].includes(activity.type)
+              ["visual_attention", "fluency", "chunk_reading", "assessment"].includes(activity.type) &&
+              !activity.level
           );
+          const moduleProgress = progressList.find((progress) => progress.moduleId === mod.id);
 
           return (
             <div key={mod.id} className="relative flex flex-col sm:flex-row gap-6 items-start">
@@ -170,6 +172,14 @@ export default function OgrenmeYoluPage() {
                     ))}
                   </div>
 
+                  {moduleProgress && (
+                    <p className="text-xs font-medium text-charcoal-muted">
+                      Modül puanı: {moduleProgress.overallScore === undefined ? "bekleniyor" : `%${moduleProgress.overallScore}`}
+                      {" · "}Okuma: {moduleProgress.readingScore === undefined ? "—" : `%${moduleProgress.readingScore}`}
+                      {" · "}Egzersiz: {moduleProgress.exerciseScore === undefined ? "—" : `%${moduleProgress.exerciseScore}`}
+                    </p>
+                  )}
+
                   <div className="pt-2 flex items-center justify-between border-t border-sage-100">
                     <span className="text-xs text-charcoal-muted">
                       {mod.prerequisites.length > 0 && !isCompleted && !isUnlocked
@@ -178,36 +188,37 @@ export default function OgrenmeYoluPage() {
                     </span>
 
                     {isUnlocked ? (
-                      moduleActivities.length > 0 ? (
-                        <div className="flex flex-wrap justify-end gap-2">
-                          {moduleActivities.map((activity) => {
-                            const tab = activity.type === "visual_attention" ? "minigame" : "reader";
-                            const params = new URLSearchParams({
-                              tab,
-                              moduleId: mod.id,
-                              activityId: activity.id,
-                            });
-                            if (activity.contentConfig.passageId) {
-                              params.set("passageId", activity.contentConfig.passageId);
-                            }
-                            return (
-                              <Link key={activity.id} href={`/panel/okuma-laboratuvari?${params.toString()}`}>
-                                <Button size="sm" variant={isCompleted ? "outline" : "amber"} className="font-semibold">
-                                  <Play className="mr-1.5 h-3.5 w-3.5" />
-                                  {activity.title}
-                                </Button>
-                              </Link>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <Link href={mod.order === 2 ? "/panel/okuma-laboratuvari?tab=minigame" : "/panel/okuma-laboratuvari"}>
-                          <Button size="sm" variant={isCompleted ? "outline" : "amber"} className="font-semibold">
-                            <Play className="mr-1.5 h-3.5 w-3.5" />
-                            {isCompleted ? "Tekrar Et" : "Modülü Başlat"}
-                          </Button>
-                        </Link>
-                      )
+                      <div className="flex flex-wrap justify-end gap-2">
+                        {mod.readingPassageId && (
+                          <Link href={`/panel/okuma-laboratuvari?moduleId=${encodeURIComponent(mod.id)}&passageId=${encodeURIComponent(mod.readingPassageId)}`}>
+                            <Button size="sm" variant="outline" className="font-semibold">
+                              <BookOpenCheck className="mr-1.5 h-3.5 w-3.5" />Okuma metni
+                            </Button>
+                          </Link>
+                        )}
+                        {mod.exerciseTypes?.length ? (
+                          <Link href={`/panel/egzersizler?moduleId=${encodeURIComponent(mod.id)}`}>
+                            <Button size="sm" variant={isCompleted ? "outline" : "amber"} className="font-semibold">
+                              <Play className="mr-1.5 h-3.5 w-3.5" />Beş seviyeli egzersizler
+                            </Button>
+                          </Link>
+                        ) : moduleActivities.length > 0 ? (
+                          moduleActivities.map((activity) => (
+                            <Link key={activity.id} href={`/panel/okuma-laboratuvari?tab=${activity.type === "visual_attention" ? "minigame" : "reader"}&moduleId=${encodeURIComponent(mod.id)}&activityId=${encodeURIComponent(activity.id)}&passageId=${encodeURIComponent(activity.contentConfig.passageId || "")}`}>
+                              <Button size="sm" variant={isCompleted ? "outline" : "amber"} className="font-semibold">
+                                <Play className="mr-1.5 h-3.5 w-3.5" />{activity.title}
+                              </Button>
+                            </Link>
+                          ))
+                        ) : (
+                          <Link href={mod.order === 2 ? "/panel/okuma-laboratuvari?tab=minigame" : `/panel/okuma-laboratuvari?moduleId=${encodeURIComponent(mod.id)}`}>
+                            <Button size="sm" variant={isCompleted ? "outline" : "amber"} className="font-semibold">
+                              <Play className="mr-1.5 h-3.5 w-3.5" />
+                              {isCompleted ? "Tekrar Et" : "Modülü Başlat"}
+                            </Button>
+                          </Link>
+                        )}
+                      </div>
                     ) : (
                       <Button size="sm" variant="outline" disabled className="opacity-50">
                         <Lock className="mr-1.5 h-3.5 w-3.5" /> Kilitli

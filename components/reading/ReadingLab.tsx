@@ -22,7 +22,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { saveReadingSession, saveAssessmentResult, upsertUserProgress } from "@/lib/firebase/firestore";
+import { saveModuleReadingScore, saveReadingSession, saveAssessmentResult } from "@/lib/firebase/firestore";
 
 interface ReadingLabProps {
   passage: ReadingPassage;
@@ -231,21 +231,7 @@ export function ReadingLab({
         });
       }
 
-      await upsertUserProgress({
-        userId: currentUserId,
-        moduleId: moduleId || "modul-1",
-        ...(activityId ? { activityId } : {}),
-        status: "completed",
-        completionPercentage: 100,
-        attemptCount: 1,
-        bestResult: {
-          wpm,
-          comprehensionScore,
-          completedAt: new Date().toISOString(),
-        },
-        lastActivityAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
+      await saveModuleReadingScore(currentUserId, moduleId || "modul-1", comprehensionScore);
     } catch (e) {
       console.warn("Sonuçlar Firestore'a kaydedilirken not:", e);
     }

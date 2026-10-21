@@ -37,6 +37,7 @@ function OkumaLaboratuvariContent() {
   const [selectedPassage, setSelectedPassage] = useState<ReadingPassage | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
+  const [requestedModuleId, setRequestedModuleId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -49,6 +50,7 @@ function OkumaLaboratuvariContent() {
       try {
         const moduleId = searchParams.get("moduleId");
         const activityId = searchParams.get("activityId");
+        if (active) setRequestedModuleId(moduleId);
         const activityList = moduleId ? await fetchActivities(moduleId) : [];
         const activity = activityList.find((item) => item.id === activityId) || null;
         if (active) setSelectedActivity(activity);
@@ -185,7 +187,7 @@ function OkumaLaboratuvariContent() {
                   ? "rsvp"
                   : "standard"
             }
-            moduleId={selectedActivity?.moduleId}
+            moduleId={selectedActivity?.moduleId || requestedModuleId || undefined}
             activityId={selectedActivity?.id}
             readingPacingWpm={selectedActivity?.contentConfig.speedPacingWpm}
             chunkSize={selectedActivity?.contentConfig.chunkSize}
