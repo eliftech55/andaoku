@@ -73,6 +73,7 @@ export interface LearningModule {
   description: string;
   targetSkills: string[];
   difficulty: DifficultyLevel;
+  educationLevel?: EducationLevel;
   order: number;
   prerequisites: string[]; // module IDs
   estimatedDuration: number; // minutes
@@ -117,6 +118,7 @@ export interface Activity {
     wordList?: string[];
     symbolGrid?: string[][];
     targetSymbol?: string;
+    gridSize?: number;
     targetKeywords?: string[];
     chunkSize?: number; // words per chunk (e.g. 2, 3, 4)
     speedPacingWpm?: number;

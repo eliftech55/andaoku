@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,13 +9,24 @@ import { Play, RotateCcw, Target, Trophy, Clock, CheckCircle, AlertTriangle } fr
 
 interface VisualAttentionGameProps {
   onComplete?: (score: { accuracy: number; totalFound: number; timeSeconds: number }) => void;
+  targetSymbol?: string;
+  gridSize?: number;
+  timeLimitSeconds?: number;
+  title?: string;
+  instructions?: string;
 }
 
-export function VisualAttentionGame({ onComplete }: VisualAttentionGameProps) {
+export function VisualAttentionGame({
+  onComplete,
+  targetSymbol = "★",
+  gridSize: requestedGridSize = 6,
+  timeLimitSeconds = 25,
+  title = "Hedef Sembolü Bulma Matrisi",
+  instructions,
+}: VisualAttentionGameProps) {
   const symbols = ["★", "▲", "●", "◆", "■", "✿", "✦", "✪"];
-  const targetSymbol = "★";
-  const gridSize = 6; // 6x6 = 36 cells
-  const gameDuration = 25; // 25 seconds
+  const gridSize = Math.min(8, Math.max(3, Math.floor(requestedGridSize)));
+  const gameDuration = Math.min(120, Math.max(10, Math.floor(timeLimitSeconds)));
 
   const [gameState, setGameState] = useState<"idle" | "playing" | "finished">("idle");
   const [grid, setGrid] = useState<string[]>([]);
@@ -23,6 +34,8 @@ export function VisualAttentionGame({ onComplete }: VisualAttentionGameProps) {
   const [wrongIndices, setWrongIndices] = useState<Set<number>>(new Set());
   const [timeLeft, setTimeLeft] = useState(gameDuration);
   const [totalTargets, setTotalTargets] = useState(0);
+  const completionReported = useRef(false);
+  const accuracy = totalTargets > 0 ? Math.round((clickedIndices.size / totalTargets) * 100) : 0;
 
   // Yeni matris üret
   const generateGrid = () => {
@@ -40,12 +53,12 @@ export function VisualAttentionGame({ onComplete }: VisualAttentionGameProps) {
       }
     }
     // En az 4 hedef olduğundan emin ol
-    if (targetCount < 4) {
-      newGrid[0] = targetSymbol;
-      newGrid[1] = targetSymbol;
-      newGrid[2] = targetSymbol;
-      newGrid[3] = targetSymbol;
-      targetCount = 4;
+    if (targetCount < Math.min(4, gridSize * gridSize)) {
+      const minimumTargets = Math.min(4, gridSize * gridSize);
+      for (let index = 0; index < minimumTargets; index++) {
+        newGrid[index] = targetSymbol;
+      }
+      targetCount = minimumTargets;
     }
     setGrid(newGrid);
     setTotalTargets(targetCount);
@@ -56,6 +69,7 @@ export function VisualAttentionGame({ onComplete }: VisualAttentionGameProps) {
 
   const handleStart = () => {
     generateGrid();
+    completionReported.current = false;
     setGameState("playing");
   };
 
@@ -82,6 +96,17 @@ export function VisualAttentionGame({ onComplete }: VisualAttentionGameProps) {
     return () => clearInterval(timer);
   }, [gameState, timeLeft]);
 
+  useEffect(() => {
+    if (gameState === "finished" && !completionReported.current) {
+      completionReported.current = true;
+      onComplete?.({
+        accuracy,
+        totalFound: clickedIndices.size,
+        timeSeconds: gameDuration - timeLeft,
+      });
+    }
+  }, [accuracy, clickedIndices.size, gameDuration, gameState, onComplete, timeLeft]);
+
   const handleCellClick = (index: number) => {
     if (gameState !== "playing") return;
     if (clickedIndices.has(index)) return;
@@ -98,9 +123,6 @@ export function VisualAttentionGame({ onComplete }: VisualAttentionGameProps) {
     }
   };
 
-  // Sonuç hesaplama
-  const accuracy = totalTargets > 0 ? Math.round((clickedIndices.size / totalTargets) * 100) : 0;
-
   return (
     <Card className="max-w-xl mx-auto border-sage-200">
       <CardHeader>
@@ -116,9 +138,9 @@ export function VisualAttentionGame({ onComplete }: VisualAttentionGameProps) {
             </div>
           )}
         </div>
-        <CardTitle className="text-xl font-serif text-charcoal mt-1">Hedef Sembolü Bulma Matrisi</CardTitle>
+        <CardTitle className="text-xl font-serif text-charcoal mt-1">{title}</CardTitle>
         <p className="text-xs text-charcoal-muted">
-          Gözün tarama hızını ve çevresel görsel dikkatini geliştirin. Tabloda gördüğünüz tüm <strong>{targetSymbol}</strong> sembollerine olabildiğince hızlı tıklayın.
+          {instructions || <>Gözün tarama hızını ve çevresel görsel dikkatini geliştirin. Tabloda gördüğünüz tüm <strong>{targetSymbol}</strong> sembollerine olabildiğince hızlı tıklayın.</>}
         </p>
       </CardHeader>
 
@@ -131,7 +153,7 @@ export function VisualAttentionGame({ onComplete }: VisualAttentionGameProps) {
             <div>
               <h4 className="font-bold text-charcoal text-base">Hedef: {targetSymbol} Yıldız Sembolü</h4>
               <p className="text-xs text-charcoal-muted mt-1 max-w-sm mx-auto">
-                25 saniyelik süreniz var. Gözünüzü matris üzerinde soldan sağa ve yukarıdan aşağıya akıcı biçimde kaydırın.
+                {gameDuration} saniyeniz var. Gözünüzü matris üzerinde soldan sağa ve yukarıdan aşağıya akıcı biçimde kaydırın.
               </p>
             </div>
             <Button size="lg" variant="amber" onClick={handleStart} className="px-8 shadow-md">
@@ -151,7 +173,7 @@ export function VisualAttentionGame({ onComplete }: VisualAttentionGameProps) {
             <Progress value={((gameDuration - timeLeft) / gameDuration) * 100} color="amber" />
 
             {/* Matris Izgarası */}
-            <div className="grid grid-cols-6 gap-2 p-3 rounded-2xl bg-ivory-warm border border-sage-200">
+            <div className="grid gap-2 rounded-2xl border border-sage-200 bg-ivory-warm p-3" style={{ gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))` }}>
               {grid.map((symbol, idx) => {
                 const isCorrect = clickedIndices.has(idx);
                 const isWrong = wrongIndices.has(idx);

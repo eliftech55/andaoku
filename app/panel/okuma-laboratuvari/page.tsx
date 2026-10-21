@@ -8,8 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { BookOpen, Target, Sparkles, Layers, RefreshCw } from "lucide-react";
-import { fetchPassages, fetchQuestionsForPassage } from "@/lib/services/contentService";
-import { ReadingPassage, Question } from "@/lib/types";
+import { fetchActivities, fetchPassageById, fetchPassages, fetchQuestionsForPassage } from "@/lib/services/contentService";
+import { upsertUserProgress } from "@/lib/firebase/firestore";
+import { useAuth } from "@/contexts/AuthContext";
+import { Activity, ReadingPassage, Question } from "@/lib/types";
 
 export default function OkumaLaboratuvariPage() {
   return (
@@ -27,39 +29,85 @@ export default function OkumaLaboratuvariPage() {
 
 function OkumaLaboratuvariContent() {
   const searchParams = useSearchParams();
+  const { user, profile } = useAuth();
   const initialTab = searchParams.get("tab") === "minigame" ? "minigame" : "reader";
 
   const [activeTab, setActiveTab] = useState<"reader" | "minigame">(initialTab);
   const [passages, setPassages] = useState<ReadingPassage[]>([]);
   const [selectedPassage, setSelectedPassage] = useState<ReadingPassage | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setActiveTab(searchParams.get("tab") === "minigame" ? "minigame" : "reader");
+  }, [searchParams]);
+
+  useEffect(() => {
+    let active = true;
     async function loadData() {
       try {
+        const moduleId = searchParams.get("moduleId");
+        const activityId = searchParams.get("activityId");
+        const activityList = moduleId ? await fetchActivities(moduleId) : [];
+        const activity = activityList.find((item) => item.id === activityId) || null;
+        if (active) setSelectedActivity(activity);
+
         const list = await fetchPassages();
+        const requestedPassageId = activity?.contentConfig.passageId || searchParams.get("passageId");
+        let target: ReadingPassage | null =
+          list.find((passage) => passage.id === requestedPassageId) || list[0] || null;
+        if (!target && requestedPassageId) {
+          target = await fetchPassageById(requestedPassageId);
+        }
+        if (!active) return;
         setPassages(list);
-        if (list.length > 0) {
-          const passageIdParam = searchParams.get("passageId");
-          const target = list.find((p) => p.id === passageIdParam) || list[0];
+        if (target) {
           setSelectedPassage(target);
           const qList = await fetchQuestionsForPassage(target.id);
-          setQuestions(qList);
+          if (active) setQuestions(qList);
         }
       } catch (e) {
-        console.error(e);
+        console.error("Okuma laboratuvarı içeriği yüklenemedi:", e);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     }
-    loadData();
+    setLoading(true);
+    void loadData();
+    return () => {
+      active = false;
+    };
   }, [searchParams]);
 
   const handlePassageSelect = async (p: ReadingPassage) => {
     setSelectedPassage(p);
     const qList = await fetchQuestionsForPassage(p.id);
     setQuestions(qList);
+  };
+
+  const handleVisualExerciseComplete = async (result: {
+    accuracy: number;
+    totalFound: number;
+    timeSeconds: number;
+  }) => {
+    const moduleId = selectedActivity?.moduleId;
+    if (!moduleId) return;
+
+    try {
+      await upsertUserProgress({
+        userId: user?.uid || profile?.uid || "misafir-okur",
+        moduleId,
+        activityId: selectedActivity.id,
+        status: "in_progress",
+        completionPercentage: result.accuracy,
+        attemptCount: 1,
+        lastActivityAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("Göz egzersizi ilerlemesi kaydedilemedi:", error);
+    }
   };
 
   return (
@@ -126,12 +174,37 @@ function OkumaLaboratuvariContent() {
       {/* İÇERİK: LABORATUVAR VEYA MİNİ OYUN */}
       {activeTab === "reader" ? (
         selectedPassage ? (
-          <ReadingLab passage={selectedPassage} questions={questions} />
+          <ReadingLab
+            key={selectedActivity?.id || selectedPassage.id}
+            passage={selectedPassage}
+            questions={questions}
+            mode={
+              selectedActivity?.type === "chunk_reading"
+                ? "chunk"
+                : selectedActivity?.type === "fluency"
+                  ? "rsvp"
+                  : "standard"
+            }
+            moduleId={selectedActivity?.moduleId}
+            activityId={selectedActivity?.id}
+            readingPacingWpm={selectedActivity?.contentConfig.speedPacingWpm}
+            chunkSize={selectedActivity?.contentConfig.chunkSize}
+          />
         ) : (
-          <div className="p-8 text-center text-charcoal-muted">Metin yükleniyor...</div>
+          <div className="p-8 text-center text-charcoal-muted">
+            {loading ? "Metin yükleniyor..." : "Bu çalışma için uygun bir okuma metni bulunamadı."}
+          </div>
         )
       ) : (
-        <VisualAttentionGame />
+        <VisualAttentionGame
+          key={selectedActivity?.id || "default-visual-exercise"}
+          targetSymbol={selectedActivity?.contentConfig.targetSymbol}
+          gridSize={selectedActivity?.contentConfig.gridSize}
+          timeLimitSeconds={selectedActivity?.contentConfig.timeLimitSeconds}
+          title={selectedActivity?.title}
+          instructions={selectedActivity?.instructions}
+          onComplete={handleVisualExerciseComplete}
+        />
       )}
     </div>
   );

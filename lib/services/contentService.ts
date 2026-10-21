@@ -31,7 +31,7 @@ import {
 export async function fetchAllModules(): Promise<LearningModule[]> {
   try {
     const list = await getLearningModulesFirestore();
-    if (list && list.length > 0) return list;
+    if (list && list.length > 0) return list.filter((module) => module.status === "published");
   } catch (e) {
     console.warn("Firestore'dan modüller alınamadı, başlangıç paketi kullanılıyor.");
   }

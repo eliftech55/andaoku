@@ -23,13 +23,14 @@ import {
   Award,
   Eye,
 } from "lucide-react";
-import { fetchAllModules } from "@/lib/services/contentService";
+import { fetchActivities, fetchAllModules } from "@/lib/services/contentService";
 import { getUserProgressList } from "@/lib/firebase/firestore";
-import { LearningModule, UserProgress } from "@/lib/types";
+import type { Activity as LearningActivity, LearningModule, UserProgress } from "@/lib/types";
 
 export default function OgrenmeYoluPage() {
   const { user, profile } = useAuth();
   const [modules, setModules] = useState<LearningModule[]>([]);
+  const [activities, setActivities] = useState<LearningActivity[]>([]);
   const [progressList, setProgressList] = useState<UserProgress[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -37,12 +38,14 @@ export default function OgrenmeYoluPage() {
     async function loadData() {
       const uid = user?.uid || profile?.uid || "demo-learner-123";
       try {
-        const [mods, progs] = await Promise.all([
+        const [mods, progs, activityList] = await Promise.all([
           fetchAllModules(),
           getUserProgressList(uid),
+          fetchActivities(),
         ]);
         setModules(mods);
         setProgressList(progs);
+        setActivities(activityList);
       } catch (e) {
         console.error(e);
       } finally {
@@ -77,7 +80,7 @@ export default function OgrenmeYoluPage() {
       <div className="space-y-2">
         <Badge variant="amber">Kişiselleştirilmiş Müfredat</Badge>
         <h1 className="text-3xl sm:text-4xl font-extrabold font-serif text-charcoal">
-          10 Aşamalı Okuma Öğrenme Yolu
+          Okuma Öğrenme Yolu
         </h1>
         <p className="text-sm text-charcoal-muted max-w-2xl leading-relaxed">
           Her modül hedeflenen bilişsel beceriyi geliştirir. Ön koşulları tamamladığınızda bir sonraki modülün kilidi açılır.
@@ -92,6 +95,11 @@ export default function OgrenmeYoluPage() {
             mod.prerequisites.every((prereq) => completedModuleIds.has(prereq));
 
           const Icon = getModuleIcon(mod.order);
+          const moduleActivities = activities.filter(
+            (activity) =>
+              activity.moduleId === mod.id &&
+              ["visual_attention", "fluency", "chunk_reading", "assessment"].includes(activity.type)
+          );
 
           return (
             <div key={mod.id} className="relative flex flex-col sm:flex-row gap-6 items-start">
@@ -170,12 +178,36 @@ export default function OgrenmeYoluPage() {
                     </span>
 
                     {isUnlocked ? (
-                      <Link href={mod.order === 2 ? "/panel/okuma-laboratuvari?tab=minigame" : "/panel/okuma-laboratuvari"}>
-                        <Button size="sm" variant={isCompleted ? "outline" : "amber"} className="font-semibold">
-                          <Play className="mr-1.5 h-3.5 w-3.5" />
-                          {isCompleted ? "Tekrar Et" : "Modülü Başlat"}
-                        </Button>
-                      </Link>
+                      moduleActivities.length > 0 ? (
+                        <div className="flex flex-wrap justify-end gap-2">
+                          {moduleActivities.map((activity) => {
+                            const tab = activity.type === "visual_attention" ? "minigame" : "reader";
+                            const params = new URLSearchParams({
+                              tab,
+                              moduleId: mod.id,
+                              activityId: activity.id,
+                            });
+                            if (activity.contentConfig.passageId) {
+                              params.set("passageId", activity.contentConfig.passageId);
+                            }
+                            return (
+                              <Link key={activity.id} href={`/panel/okuma-laboratuvari?${params.toString()}`}>
+                                <Button size="sm" variant={isCompleted ? "outline" : "amber"} className="font-semibold">
+                                  <Play className="mr-1.5 h-3.5 w-3.5" />
+                                  {activity.title}
+                                </Button>
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <Link href={mod.order === 2 ? "/panel/okuma-laboratuvari?tab=minigame" : "/panel/okuma-laboratuvari"}>
+                          <Button size="sm" variant={isCompleted ? "outline" : "amber"} className="font-semibold">
+                            <Play className="mr-1.5 h-3.5 w-3.5" />
+                            {isCompleted ? "Tekrar Et" : "Modülü Başlat"}
+                          </Button>
+                        </Link>
+                      )
                     ) : (
                       <Button size="sm" variant="outline" disabled className="opacity-50">
                         <Lock className="mr-1.5 h-3.5 w-3.5" /> Kilitli

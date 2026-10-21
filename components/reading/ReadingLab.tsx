@@ -28,10 +28,23 @@ interface ReadingLabProps {
   passage: ReadingPassage;
   questions?: Question[];
   mode?: "standard" | "chunk" | "rsvp";
+  moduleId?: string;
+  activityId?: string;
+  readingPacingWpm?: number;
+  chunkSize?: number;
   onComplete?: (result: { wpm: number; comprehensionScore: number; durationSeconds: number }) => void;
 }
 
-export function ReadingLab({ passage, questions = [], mode: initialMode = "standard", onComplete }: ReadingLabProps) {
+export function ReadingLab({
+  passage,
+  questions = [],
+  mode: initialMode = "standard",
+  moduleId,
+  activityId,
+  readingPacingWpm = 250,
+  chunkSize = 2,
+  onComplete,
+}: ReadingLabProps) {
   const { user, profile, updatePreferences } = useAuth();
 
   // Okuma durumları
@@ -51,7 +64,7 @@ export function ReadingLab({ passage, questions = [], mode: initialMode = "stand
   // RSVP / Blok Okuma Durumu
   const [words, setWords] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [rsvpPacingWpm, setRsvpPacingWpm] = useState(250);
+  const [rsvpPacingWpm, setRsvpPacingWpm] = useState(readingPacingWpm);
   const rsvpTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Soru & Anlama Durumu
@@ -90,7 +103,7 @@ export function ReadingLab({ passage, questions = [], mode: initialMode = "stand
   // RSVP kelime akışı
   useEffect(() => {
     if (readingState === "reading" && (readingMode === "rsvp" || readingMode === "chunk")) {
-      const stepSize = readingMode === "chunk" ? 2 : 1;
+      const stepSize = readingMode === "chunk" ? Math.max(2, Math.floor(chunkSize)) : 1;
       const intervalMs = Math.round((60 / rsvpPacingWpm) * 1000 * stepSize);
 
       rsvpTimerRef.current = setInterval(() => {
@@ -108,7 +121,7 @@ export function ReadingLab({ passage, questions = [], mode: initialMode = "stand
     return () => {
       if (rsvpTimerRef.current) clearInterval(rsvpTimerRef.current);
     };
-  }, [readingState, readingMode, rsvpPacingWpm, words]);
+  }, [readingState, readingMode, rsvpPacingWpm, chunkSize, words]);
 
   const handleStart = () => {
     setReadingState("reading");
@@ -189,6 +202,7 @@ export function ReadingLab({ passage, questions = [], mode: initialMode = "stand
         userId: currentUserId,
         passageId: passage.id,
         passageVersion: passage.version || 1,
+        ...(activityId ? { activityId } : {}),
         startedAt: new Date(Date.now() - secondsElapsed * 1000).toISOString(),
         completedAt: new Date().toISOString(),
         durationSeconds: secondsElapsed,
@@ -219,7 +233,8 @@ export function ReadingLab({ passage, questions = [], mode: initialMode = "stand
 
       await upsertUserProgress({
         userId: currentUserId,
-        moduleId: "modul-1",
+        moduleId: moduleId || "modul-1",
+        ...(activityId ? { activityId } : {}),
         status: "completed",
         completionPercentage: 100,
         attemptCount: 1,

@@ -195,6 +195,11 @@ export default function YonetimPaneliPage() {
         </div>
 
         <div className="flex gap-2">
+          <Link href="/yonetim/moduller">
+            <Button size="sm" variant="amber">
+              <Layers className="mr-1.5 h-4 w-4" /> Modül Yönetimi
+            </Button>
+          </Link>
           <Link href="/yonetim/icerik">
             <Button size="sm" variant="outline">
               <FileText className="mr-1.5 h-4 w-4" /> İçerik Yönetimi

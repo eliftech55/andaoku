@@ -33,6 +33,7 @@ export default function UserDashboardPage() {
 
   const [assessmentResults, setAssessmentResults] = useState<AssessmentResult[]>([]);
   const [progressList, setProgressList] = useState<UserProgress[]>([]);
+  const [totalModules, setTotalModules] = useState(0);
   const [readingSessions, setReadingSessions] = useState<ReadingSession[]>([]);
   const [recommendation, setRecommendation] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -52,6 +53,7 @@ export default function UserDashboardPage() {
 
         setAssessmentResults(results);
         setProgressList(progress);
+        setTotalModules(modules.length);
         setReadingSessions(sessions);
 
         // Kural tabanlı öneri motorunu çalıştır
@@ -156,7 +158,7 @@ export default function UserDashboardPage() {
               <CheckCircle2 className="h-4 w-4 text-emerald-600" />
             </div>
             <div className="text-2xl sm:text-3xl font-extrabold font-mono text-charcoal">
-              {completedModulesCount} <span className="text-xs font-sans text-charcoal-muted font-normal">/ 10</span>
+              {completedModulesCount} <span className="text-xs font-sans text-charcoal-muted font-normal">/ {totalModules}</span>
             </div>
             <p className="text-[11px] text-charcoal-muted">Tamamlanan modül</p>
           </CardContent>

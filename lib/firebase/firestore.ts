@@ -11,6 +11,7 @@ import {
   orderBy,
   limit,
   serverTimestamp,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "./client";
 import {
@@ -113,6 +114,22 @@ export async function getLearningModules(): Promise<LearningModule[]> {
     console.error("Modülleri getirme hatası:", error);
     return [];
   }
+}
+
+export async function saveLearningModuleWithActivities(
+  module: LearningModule,
+  activities: Activity[]
+): Promise<void> {
+  const batch = writeBatch(db);
+  const { id: moduleId, ...moduleData } = module;
+
+  batch.set(doc(db, "learningModules", moduleId), moduleData);
+
+  activities.forEach(({ id, ...activityData }) => {
+    batch.set(doc(db, "activities", id), activityData);
+  });
+
+  await batch.commit();
 }
 
 // ==========================================
