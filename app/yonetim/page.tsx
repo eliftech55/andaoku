@@ -6,9 +6,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { collection, doc, getDoc, getDocs, setDoc } from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 import { db, isFirebaseConfigured } from "@/lib/firebase/client";
-import { SEED_PASSAGES } from "@/lib/services/seedData";
 import {
   Activity,
   Users,
@@ -32,17 +31,12 @@ export default function YonetimPaneliPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [firestoreError, setFirestoreError] = useState<string | null>(null);
-  const [missingSeedPassages, setMissingSeedPassages] = useState<string[]>([]);
-  const [seedMessage, setSeedMessage] = useState<string | null>(null);
-  const [isSeeding, setIsSeeding] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     if (authLoading) return;
 
     if (!profile || profile.role !== "admin") {
       setStats(null);
-      setMissingSeedPassages([]);
       setFirestoreError(null);
       setIsLoading(false);
       return;
@@ -62,19 +56,18 @@ export default function YonetimPaneliPage() {
 
     async function loadDashboardStats() {
       try {
-        const [usersSnapshot, passagesSnapshot, modulesSnapshot] = await Promise.all([
+        const [usersSnapshot, contentPackagesSnapshot, modulesSnapshot] = await Promise.all([
           getDocs(collection(db, "users")),
-          getDocs(collection(db, "readingPassages")),
+          getDocs(collection(db, "placementExams")),
           getDocs(collection(db, "learningModules")),
         ]);
 
         if (!isCurrent) return;
 
-        const passages = passagesSnapshot.docs.map((document) => document.data());
+        const contentPackages = contentPackagesSnapshot.docs.map((document) => document.data());
         const modules = modulesSnapshot.docs.map((document) => document.data());
-        const passageIds = new Set(passagesSnapshot.docs.map((document) => document.id));
-        const publishedPassages = passages.filter((passage) => passage.status === "published").length;
-        const draftPassages = passages.filter((passage) => passage.status === "draft").length;
+        const publishedPassages = contentPackages.filter((item) => item.status === "published").length;
+        const draftPassages = contentPackages.filter((item) => item.status === "draft").length;
 
         setStats({
           totalUsers: usersSnapshot.size,
@@ -83,9 +76,6 @@ export default function YonetimPaneliPage() {
           activeModules: modules.filter((module) => module.status === "published").length,
           totalModules: modulesSnapshot.size,
         });
-        setMissingSeedPassages(
-          SEED_PASSAGES.filter((passage) => !passageIds.has(passage.id)).map((passage) => passage.id)
-        );
         setFirestoreError(null);
       } catch (error) {
         console.error("Yönetici paneli Firestore verileri yüklenemedi:", error);
@@ -105,40 +95,10 @@ export default function YonetimPaneliPage() {
     return () => {
       isCurrent = false;
     };
-  }, [authLoading, profile, refreshKey]);
+  }, [authLoading, profile]);
 
   const hasAdminAccess = !authLoading && profile?.role === "admin";
   const displayedStats = stats;
-
-  const handleImportSeedPassages = async () => {
-    if (!hasAdminAccess || !isFirebaseConfigured || isSeeding) return;
-
-    setIsSeeding(true);
-    setSeedMessage(null);
-
-    try {
-      const missing = SEED_PASSAGES.filter((passage) => missingSeedPassages.includes(passage.id));
-      await Promise.all(
-        missing.map(async ({ id, ...passage }) => {
-          const passageRef = doc(db, "readingPassages", id);
-          const existingPassage = await getDoc(passageRef);
-          if (!existingPassage.exists()) {
-            await setDoc(passageRef, passage);
-          }
-        })
-      );
-
-      setSeedMessage("Eksik örnek metinler Firestore’a aktarıldı.");
-      setRefreshKey((key) => key + 1);
-    } catch (error) {
-      console.error("Örnek metinler Firestore’a aktarılamadı:", error);
-      setSeedMessage(
-        "Örnek metinler aktarılamadı. Firestore erişim yetkinizi kontrol edip yeniden deneyin."
-      );
-    } finally {
-      setIsSeeding(false);
-    }
-  };
 
   const systemStats = [
     {
@@ -148,7 +108,7 @@ export default function YonetimPaneliPage() {
       icon: Users,
     },
     {
-      label: "Yayınlanan Metinler",
+      label: "Yayınlanan İçerikler",
       val:
         isLoading || !hasAdminAccess || !displayedStats
           ? "—"
@@ -179,7 +139,7 @@ export default function YonetimPaneliPage() {
             : "Bağlı",
       change: !hasAdminAccess
         ? "Firestore verileri yönetici oturumu gerektirir"
-        : firestoreError || "Kullanıcı, metin ve modül sorguları başarılı",
+        : firestoreError || "Kullanıcı, içerik paketi ve modül sorguları başarılı",
       icon: Database,
     },
   ];
@@ -252,32 +212,6 @@ export default function YonetimPaneliPage() {
         </div>
       )}
 
-      {hasAdminAccess && missingSeedPassages.length > 0 && (
-        <Card className="border-amber-200 bg-amber-50">
-          <CardContent className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5">
-            <div>
-              <p className="font-semibold text-charcoal">Örnek metinler Firestore’da kayıtlı değil</p>
-              <p className="text-sm text-charcoal-muted">
-                İçerik ekranında gösterilen {missingSeedPassages.length} yerleşik metni veritabanına ekleyin.
-              </p>
-              {seedMessage && (
-                <p role="status" className="mt-2 text-sm text-charcoal">
-                  {seedMessage}
-                </p>
-              )}
-            </div>
-            <Button
-              size="sm"
-              variant="amber"
-              onClick={handleImportSeedPassages}
-              disabled={isSeeding || isLoading}
-            >
-              {isSeeding ? "Aktarılıyor..." : "Örnek metinleri Firestore’a aktar"}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Firestore bağlantı kontrolü */}
       <Card className={`border-sage-200 bg-white ${firestoreError ? "border-red-200" : ""}`}>
         <CardHeader>
@@ -301,7 +235,7 @@ export default function YonetimPaneliPage() {
               : firestoreError
                 ? firestoreError
                 : displayedStats
-                  ? `Firestore bağlantısı başarılı. ${displayedStats.totalUsers} kullanıcı, ${displayedStats.publishedPassages} yayınlanmış metin ve ${displayedStats.activeModules} aktif modül okundu.`
+                  ? `Firestore bağlantısı başarılı. ${displayedStats.totalUsers} kullanıcı, ${displayedStats.publishedPassages} yayınlanmış içerik paketi ve ${displayedStats.activeModules} aktif modül okundu.`
                   : "Firestore verileri yüklenemedi."}
           </p>
           <p className="text-xs">
