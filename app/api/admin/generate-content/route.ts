@@ -1,4 +1,5 @@
 import { generateText, Output } from "ai";
+import { createGoogle } from "@ai-sdk/google";
 import { NextRequest, NextResponse } from "next/server";
 import { countTurkishWords } from "@/lib/utils/readingMetrics";
 import { generatedContentSchema, generationInputSchema } from "@/lib/validation/generatedContent";
@@ -77,14 +78,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Bu işlem için yönetici yetkisi gerekir." }, { status: 403 });
     }
 
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: "GEMINI_API_KEY sunucu ortam değişkeni yapılandırılmamış." },
+        { status: 503 }
+      );
+    }
+
     const inputResult = generationInputSchema.safeParse(await request.json());
     if (!inputResult.success) {
       return NextResponse.json({ error: "Konu, seviye veya eğitim kademesi geçersiz." }, { status: 400 });
     }
     const input = inputResult.data;
+    const google = createGoogle({ apiKey });
 
     const { output } = await generateText({
-      model: "google/gemini-3.8-flash",
+      model: google("gemini-3.8-flash"),
       maxOutputTokens: 9000,
       abortSignal: AbortSignal.timeout(50000),
       output: Output.object({ schema: generatedContentSchema }),

@@ -11,6 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@ai-sdk/google": "^4.0.102",
     "@hookform/resolvers": "^3.9.0",
     "ai": "^7.0.148",
     "clsx": "^2.1.1",
