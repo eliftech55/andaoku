@@ -132,25 +132,15 @@ export function Navbar() {
           )}
 
           {(profile?.role === "admin" || profile?.role === "content_manager") && (
-            <div className="flex items-center gap-4">
-              <Link
-                href="/yonetim"
-                className={`transition-colors hover:text-brand-700 font-semibold flex items-center gap-1.5 ${
-                  isActive("/yonetim") ? "text-brand-800" : "text-brand-700"
-                }`}
-              >
-                <Shield className="h-4 w-4" />
-                Yönetim
-              </Link>
-              <Link
-                href="/yonetim/baslangic-sinavlari"
-                className={`transition-colors hover:text-brand-700 font-semibold flex items-center gap-1.5 ${
-                  isActive("/yonetim/baslangic-sinavlari") ? "text-brand-800" : "text-brand-700"
-                }`}
-              >
-                Sınav Yönetimi
-              </Link>
-            </div>
+            <Link
+              href="/yonetim"
+              className={`transition-colors hover:text-brand-700 font-semibold flex items-center gap-1.5 ${
+                isActive("/yonetim") ? "text-brand-800" : "text-brand-700"
+              }`}
+            >
+              <Shield className="h-4 w-4" />
+              Yönetim
+            </Link>
           )}
         </nav>
 

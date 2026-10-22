@@ -7,6 +7,15 @@ export type UserRole = "learner" | "teacher" | "content_manager" | "admin" | "re
 
 export type EducationLevel = "primary" | "middle" | "high" | "university" | "adult";
 
+export type LearningStage =
+  | "placement_exam"
+  | "module_1"
+  | "module_2"
+  | "module_3"
+  | "module_4"
+  | "module_5"
+  | "exercises";
+
 export type DifficultyLevel = "beginner" | "intermediate" | "advanced";
 
 export type ContentStatus = "draft" | "published" | "archived";
@@ -57,6 +66,7 @@ export interface ReadingPassage {
   content: string;
   wordCount: number;
   educationLevels: EducationLevel[];
+  learningStage?: LearningStage;
   ageGroups: string[];
   difficulty: DifficultyLevel;
   genre: "bilgilendirici" | "oykuleyici" | "aciklayici" | "akademik" | "diger";

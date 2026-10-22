@@ -3,27 +3,40 @@
 import React, { useState, useEffect } from "react";
 import { fetchPassages } from "@/lib/services/contentService";
 import { saveReadingPassage } from "@/lib/firebase/firestore";
-import { ReadingPassage, DifficultyLevel, ContentStatus } from "@/lib/types";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import BaslangicSinavlariYonetimPage from "../baslangic-sinavlari/page";
+import { ReadingPassage, DifficultyLevel, ContentStatus, LearningStage } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { countTurkishWords } from "@/lib/utils";
-import { Plus, Edit, FileText, CheckCircle2, Eye, ShieldAlert } from "lucide-react";
+import { Plus, Edit, FileText, CheckCircle2, ClipboardCheck } from "lucide-react";
+
+const learningStages: { value: LearningStage; label: string }[] = [
+  { value: "placement_exam", label: "Başlangıç sınavı" },
+  { value: "module_1", label: "Modül 1" },
+  { value: "module_2", label: "Modül 2" },
+  { value: "module_3", label: "Modül 3" },
+  { value: "module_4", label: "Modül 4" },
+  { value: "module_5", label: "Modül 5" },
+  { value: "exercises", label: "Alıştırmalar" },
+];
 
 export default function IcerikYonetimiPage() {
   const [passages, setPassages] = useState<ReadingPassage[]>([]);
+  const [activeTab, setActiveTab] = useState<"content" | "exams">("content");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   // Form alanları
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [genre, setGenre] = useState<any>("bilgilendirici");
+  const [genre, setGenre] = useState<ReadingPassage["genre"]>("bilgilendirici");
   const [topic, setTopic] = useState("");
   const [difficulty, setDifficulty] = useState<DifficultyLevel>("intermediate");
+  const [learningStage, setLearningStage] = useState<LearningStage>("module_1");
   const [status, setStatus] = useState<ContentStatus>("published");
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -40,7 +53,9 @@ export default function IcerikYonetimiPage() {
     setGenre("bilgilendirici");
     setTopic("");
     setDifficulty("intermediate");
+    setLearningStage("module_1");
     setStatus("published");
+    setSaveError(null);
     setModalOpen(true);
   };
 
@@ -51,51 +66,62 @@ export default function IcerikYonetimiPage() {
     setGenre(p.genre);
     setTopic(p.topic);
     setDifficulty(p.difficulty);
+    setLearningStage(p.learningStage || "module_1");
     setStatus(p.status);
+    setSaveError(null);
     setModalOpen(true);
   };
 
   const handleSave = async () => {
-    if (!title || !content) return;
+    if (!title.trim() || !content.trim()) {
+      setSaveError("Metin başlığı ve içeriği boş bırakılamaz.");
+      return;
+    }
 
     const wordCount = countTurkishWords(content);
     const estimatedReadingTime = Math.round((wordCount / 180) * 60);
 
-    const passageData = {
+    const now = new Date().toISOString();
+    const passageData: Omit<ReadingPassage, "id"> = {
       title,
       content,
       wordCount,
-      educationLevels: ["middle", "high"] as any,
+      educationLevels: ["middle", "high"],
       ageGroups: ["12-18"],
       difficulty,
       genre,
+      learningStage,
       topic: topic || "Genel Kültür",
       targetSkills: ["ana_fikir", "cikarim_yapma"],
       estimatedReadingTime,
       status,
       version: editingId ? 2 : 1,
       createdBy: "editor",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      publishedAt: status === "published" ? new Date().toISOString() : undefined,
+      createdAt: now,
+      updatedAt: now,
+      ...(status === "published" ? { publishedAt: now } : {}),
     };
 
-    if (editingId) {
-      setPassages((prev) =>
-        prev.map((item) => (item.id === editingId ? { id: editingId, ...passageData } : item))
-      );
-    } else {
-      const newId = "metin-" + Date.now();
-      setPassages((prev) => [{ id: newId, ...passageData }, ...prev]);
-    }
-
-    setModalOpen(false);
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
-
+    setSaveError(null);
     try {
-      await saveReadingPassage(passageData, editingId || undefined);
-    } catch (e) {}
+      const savedId = await saveReadingPassage(passageData, editingId || undefined);
+      const passageId = editingId || savedId || "metin-" + Date.now();
+      setPassages((prev) =>
+        editingId
+          ? prev.map((item) =>
+              item.id === editingId ? { id: passageId, ...passageData } : item
+            )
+          : [{ id: passageId, ...passageData }, ...prev]
+      );
+      setModalOpen(false);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (error) {
+      console.error("İçerik kaydedilemedi:", error);
+      setSaveError(
+        error instanceof Error ? error.message : "İçerik kaydedilirken beklenmeyen bir hata oluştu."
+      );
+    }
   };
 
   return (
@@ -103,17 +129,52 @@ export default function IcerikYonetimiPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-sage-200">
         <div>
           <Badge variant="amber" className="mb-1">Eğitsel İçerik & Sürüm Kontrolü</Badge>
-          <h1 className="text-3xl font-extrabold font-serif text-charcoal">İçerik Yönetim Paneli</h1>
+          <h1 className="text-3xl font-extrabold font-serif text-charcoal">İçerik ve Sınav Yönetimi</h1>
           <p className="text-xs sm:text-sm text-charcoal-muted">
-            Okuma metinleri, anlama soruları, zorluk dereceleri ve yayın durumlarını yapılandırın.
+            Okuma içeriklerini ve başlangıç sınavlarını tek bir yerden yönetin.
           </p>
         </div>
 
-        <Button size="sm" variant="amber" onClick={handleOpenNew}>
-          <Plus className="mr-1.5 h-4 w-4" /> Yeni Okuma Metni Ekle
-        </Button>
+        {activeTab === "content" && (
+          <Button size="sm" variant="amber" onClick={handleOpenNew}>
+            <Plus className="mr-1.5 h-4 w-4" /> Yeni İçerik Ekle
+          </Button>
+        )}
       </div>
 
+      <div role="tablist" aria-label="Yönetilecek içerik türü" className="flex gap-2 border-b border-sage-200">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "content"}
+          onClick={() => setActiveTab("content")}
+          className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold transition-colors ${
+            activeTab === "content"
+              ? "border-brand-700 text-brand-800"
+              : "border-transparent text-charcoal-muted hover:text-charcoal"
+          }`}
+        >
+          <FileText className="h-4 w-4" /> İçerikler
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "exams"}
+          onClick={() => setActiveTab("exams")}
+          className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold transition-colors ${
+            activeTab === "exams"
+              ? "border-brand-700 text-brand-800"
+              : "border-transparent text-charcoal-muted hover:text-charcoal"
+          }`}
+        >
+          <ClipboardCheck className="h-4 w-4" /> Sınavlar
+        </button>
+      </div>
+
+      {activeTab === "exams" ? (
+        <BaslangicSinavlariYonetimPage />
+      ) : (
+        <>
       {saveSuccess && (
         <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
           <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
@@ -128,6 +189,7 @@ export default function IcerikYonetimiPage() {
             <thead className="bg-ivory-warm border-b border-sage-200 text-charcoal font-semibold">
               <tr>
                 <th className="p-3.5">Başlık</th>
+                <th className="p-3.5">Seviye</th>
                 <th className="p-3.5">Tür</th>
                 <th className="p-3.5">Zorluk</th>
                 <th className="p-3.5">Kelime</th>
@@ -140,6 +202,9 @@ export default function IcerikYonetimiPage() {
               {passages.map((p) => (
                 <tr key={p.id} className="hover:bg-ivory-warm/50 transition-colors">
                   <td className="p-3.5 font-bold text-charcoal">{p.title}</td>
+                  <td className="p-3.5 text-charcoal-muted">
+                    {learningStages.find((stage) => stage.value === p.learningStage)?.label || "—"}
+                  </td>
                   <td className="p-3.5 capitalize text-charcoal-muted">{p.genre}</td>
                   <td className="p-3.5 capitalize">{p.difficulty}</td>
                   <td className="p-3.5 text-charcoal-muted">{p.wordCount || countTurkishWords(p.content)}</td>
@@ -166,7 +231,7 @@ export default function IcerikYonetimiPage() {
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         title={editingId ? "Metni Düzenle" : "Yeni Okuma Metni Oluştur"}
-        description="Özgün, telif haklarına uygun ve hedef yaş grubuna hitap eden eğitsel içerik girin."
+        description="Özgün, telif haklarına uygun ve seçilen seviyeye uygun eğitsel içerik girin."
         maxWidth="lg"
         footer={
           <div className="flex gap-2">
@@ -180,6 +245,11 @@ export default function IcerikYonetimiPage() {
         }
       >
         <div className="space-y-4 text-xs">
+          {saveError && (
+            <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-red-800">
+              {saveError}
+            </div>
+          )}
           <div>
             <label className="block font-semibold mb-1">Metin Başlığı</label>
             <input
@@ -191,12 +261,12 @@ export default function IcerikYonetimiPage() {
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div>
               <label className="block font-semibold mb-1">Tür</label>
               <select
                 value={genre}
-                onChange={(e) => setGenre(e.target.value)}
+                onChange={(e) => setGenre(e.target.value as ReadingPassage["genre"])}
                 className="w-full p-2 rounded-xl border border-sage-200 bg-white"
               >
                 <option value="bilgilendirici">Bilgilendirici</option>
@@ -206,10 +276,24 @@ export default function IcerikYonetimiPage() {
               </select>
             </div>
             <div>
+              <label className="block font-semibold mb-1">Seviye</label>
+              <select
+                value={learningStage}
+                onChange={(e) => setLearningStage(e.target.value as LearningStage)}
+                className="w-full p-2 rounded-xl border border-sage-200 bg-white"
+              >
+                {learningStages.map((stage) => (
+                  <option key={stage.value} value={stage.value}>
+                    {stage.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
               <label className="block font-semibold mb-1">Zorluk Seviyesi</label>
               <select
                 value={difficulty}
-                onChange={(e) => setDifficulty(e.target.value as any)}
+                onChange={(e) => setDifficulty(e.target.value as DifficultyLevel)}
                 className="w-full p-2 rounded-xl border border-sage-200 bg-white"
               >
                 <option value="beginner">Başlangıç</option>
@@ -221,7 +305,7 @@ export default function IcerikYonetimiPage() {
               <label className="block font-semibold mb-1">Yayın Durumu</label>
               <select
                 value={status}
-                onChange={(e) => setStatus(e.target.value as any)}
+                onChange={(e) => setStatus(e.target.value as ContentStatus)}
                 className="w-full p-2 rounded-xl border border-sage-200 bg-white"
               >
                 <option value="published">Yayında</option>
@@ -245,6 +329,8 @@ export default function IcerikYonetimiPage() {
           </div>
         </div>
       </Modal>
+        </>
+      )}
     </div>
   );
 }
