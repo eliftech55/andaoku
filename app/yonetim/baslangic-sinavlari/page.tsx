@@ -16,9 +16,11 @@ import {
   getPlacementExamsFromDatabase,
   getPlacementPassageFromDatabase,
   getPlacementQuestionsFromDatabase,
+  deletePlacementExamPackageFromDatabase,
   savePlacementExamPackageToDatabase,
 } from "@/lib/services/placementExamService";
 import { countTurkishWords, formatDuration } from "@/lib/utils/readingMetrics";
+import { generatedContentSchema } from "@/lib/validation/generatedContent";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +35,7 @@ import {
   Layers,
   Copy,
   Archive,
+  Trash2,
   ArrowRight,
   ShieldCheck,
   BookOpen,
@@ -49,13 +52,17 @@ const learningStages: { value: LearningStage; label: string }[] = [
 ];
 
 export default function BaslangicSinavlariYonetimPage() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
 
   const [exams, setExams] = useState<PlacementExam[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [deletingExamCode, setDeletingExamCode] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+  const [hasGeneratedContent, setHasGeneratedContent] = useState(false);
 
   // Düzenleme / Oluşturma Modalı
   const [editorModalOpen, setEditorModalOpen] = useState(false);
@@ -133,6 +140,28 @@ export default function BaslangicSinavlariYonetimPage() {
     }
   }
 
+  const handleDeleteExam = async (exam: PlacementExam) => {
+    if (deletingExamCode) return;
+    const confirmed = window.confirm(
+      `"${exam.title}" içerik paketini silmek istediğinize emin misiniz? Bu işlem pakete ait metin ve soruları da siler. Öğrenci sınav sonuçları korunur.`
+    );
+    if (!confirmed) return;
+
+    setDeletingExamCode(exam.code);
+    setLoadError(null);
+    try {
+      await deletePlacementExamPackageFromDatabase(exam);
+      setExams((currentExams) => currentExams.filter((item) => item.code !== exam.code));
+    } catch (error) {
+      console.error("İçerik paketi silinemedi:", error);
+      setLoadError(
+        error instanceof Error ? error.message : "İçerik paketi silinirken beklenmeyen bir hata oluştu."
+      );
+    } finally {
+      setDeletingExamCode(null);
+    }
+  };
+
   // Yeni içerik paketini aç
   const handleOpenNew = () => {
     setEditingExamCode(null);
@@ -152,7 +181,89 @@ export default function BaslangicSinavlariYonetimPage() {
     setFormQuestions([createEmptyQuestion(newCode, 1)]);
     setActiveQuestionTab(0);
     setValidationErrors([]);
+    setGenerationError(null);
+    setHasGeneratedContent(false);
     setEditorModalOpen(true);
+  };
+
+  const handleGenerateContent = async () => {
+    if (isGenerating) return;
+    if (!user) {
+      setGenerationError("Yapay zekâ kullanımı için yönetici hesabıyla oturum açın.");
+      return;
+    }
+    if (formTopic.trim().length < 2) {
+      setGenerationError("Önce konu alanına en az 2 karakterlik bir konu yazın.");
+      return;
+    }
+
+    setIsGenerating(true);
+    setGenerationError(null);
+    try {
+      const idToken = await user.getIdToken();
+      const response = await fetch("/api/admin/generate-content", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          topic: formTopic.trim(),
+          learningStage: formStage,
+          educationLevels: formEducationLevels,
+        }),
+      });
+      const responseBody: unknown = await response.json();
+      if (!response.ok) {
+        const message =
+          typeof responseBody === "object" &&
+          responseBody !== null &&
+          "error" in responseBody &&
+          typeof responseBody.error === "string"
+            ? responseBody.error
+            : "Yapay zekâ içerik üretemedi.";
+        throw new Error(message);
+      }
+      const result = generatedContentSchema.parse(responseBody);
+
+      const generatedExamCode = editingExamCode || formExamCode;
+      const now = new Date().toISOString();
+      const generatedQuestions: PlacementQuestion[] = result.questions.map((question, index) => ({
+          id: `q-${generatedExamCode}-${Date.now()}-${index + 1}`,
+          examId: generatedExamCode,
+          examVersion: 1,
+          passageVersion: 1,
+          questionText: question.questionText,
+          questionType: question.questionType,
+          options: question.options,
+          correctOptionId: question.correctOptionId,
+          explanation: question.explanation,
+          points: 10,
+          order: index + 1,
+          status: "draft",
+          createdAt: now,
+          updatedAt: now,
+        }));
+
+      setFormExamTitle(result.title);
+      setFormDescription(result.description);
+      setFormPassageTitle(result.passageTitle);
+      setFormPassageContent(result.passageContent);
+      setFormGenre(result.genre);
+      setFormTopic(result.topic);
+      setFormQuestions(generatedQuestions);
+      setActiveQuestionTab(0);
+      setFormStatus("draft");
+      setHasGeneratedContent(true);
+      setValidationErrors([]);
+    } catch (error) {
+      console.error("Yapay zekâ içerik oluşturma isteği başarısız:", error);
+      setGenerationError(
+        error instanceof Error ? error.message : "İçerik oluşturulurken beklenmeyen bir hata oluştu."
+      );
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   // Mevcut Sınavı Düzenleme Modunda Aç
@@ -164,6 +275,8 @@ export default function BaslangicSinavlariYonetimPage() {
     setFormStage(exam.learningStage || "placement_exam");
     setFormEducationLevels(exam.educationLevels?.length ? exam.educationLevels : ["middle"]);
     setFormStatus(exam.status);
+    setGenerationError(null);
+    setHasGeneratedContent(false);
 
     setLoadError(null);
     try {
@@ -249,6 +362,9 @@ export default function BaslangicSinavlariYonetimPage() {
 
     if (formQuestions.length < 1 || formQuestions.length > 10) {
       errors.push(`Sınavda 1 ile 10 arasında soru bulunmalıdır. Mevcut: ${formQuestions.length}`);
+    }
+    if (hasGeneratedContent && formQuestions.length !== 10) {
+      errors.push("Yapay zekâ taslağı onaylanmadan önce 10 sorunun tamamı bulunmalıdır.");
     }
 
     formQuestions.forEach((q, idx) => {
@@ -348,7 +464,11 @@ export default function BaslangicSinavlariYonetimPage() {
       await savePlacementExamPackageToDatabase({
         exam: examObj,
         passage: passageObj,
-        questions: formQuestions,
+        questions: formQuestions.map((question) => ({
+          ...question,
+          status: formStatus,
+          updatedAt: new Date().toISOString(),
+        })),
       });
       setEditorModalOpen(false);
       setSaveSuccessNotice(true);
@@ -401,7 +521,7 @@ export default function BaslangicSinavlariYonetimPage() {
 
       {loadError && (
         <div role="alert" className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs">
-          Sınav verileri yüklenemedi: {loadError}
+          İçerik işlemi tamamlanamadı: {loadError}
         </div>
       )}
 
@@ -457,13 +577,25 @@ export default function BaslangicSinavlariYonetimPage() {
                       {ex.status === "published" ? "Yayında" : "Taslak"}
                     </Badge>
                   </td>
-                  <td className="p-3.5 text-right space-x-1">
+                  <td className="p-3.5 text-right">
+                    <div className="flex justify-end gap-1">
                     <Button size="sm" variant="ghost" onClick={() => handleOpenPreview(ex)}>
                       <Eye className="h-3.5 w-3.5 mr-1" /> Ön İzle
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => handleEditExam(ex)}>
                       <Edit className="h-3.5 w-3.5 mr-1" /> Düzenle
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => void handleDeleteExam(ex)}
+                      disabled={deletingExamCode !== null}
+                      aria-label={`${ex.title} içeriğini sil`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-1" />
+                      {deletingExamCode === ex.code ? "Siliniyor..." : "Sil"}
+                    </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -487,7 +619,11 @@ export default function BaslangicSinavlariYonetimPage() {
               Vazgeç
             </Button>
             <Button variant="primary" size="sm" onClick={handleSaveExam} isLoading={isSaving}>
-              {isSaving ? "Kaydediliyor..." : "Doğrula ve Kaydet"}
+              {isSaving
+                ? "Kaydediliyor..."
+                : hasGeneratedContent
+                  ? "İnceledim, Onayla ve Kaydet"
+                  : "Doğrula ve Kaydet"}
             </Button>
           </div>
         }
@@ -540,6 +676,16 @@ export default function BaslangicSinavlariYonetimPage() {
                   className="w-full p-2.5 rounded-xl border border-sage-200 bg-white font-mono"
                 />
               </div>
+              <div className="sm:col-span-2">
+                <label className="font-semibold block mb-1">Açıklama</label>
+                <input
+                  type="text"
+                  value={formDescription}
+                  onChange={(e) => setFormDescription(e.target.value)}
+                  maxLength={300}
+                  className="w-full p-2.5 rounded-xl border border-sage-200 bg-white"
+                />
+              </div>
               <div>
                 <label className="font-semibold block mb-1">Seviye</label>
                 <select
@@ -577,6 +723,36 @@ export default function BaslangicSinavlariYonetimPage() {
                 />
               </div>
             </div>
+          </div>
+
+          <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4 space-y-3">
+            <div>
+              <h4 className="font-bold text-charcoal text-sm">Yapay zekâ ile içerik oluştur</h4>
+              <p className="mt-1 text-charcoal-muted">
+                Konu ve seviyeye göre özgün okuma metni ile 10 soru taslak olarak hazırlanır.
+                Veritabanına yalnızca inceleyip onayladıktan sonra eklenir.
+              </p>
+            </div>
+            {generationError && (
+              <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-rose-800">
+                {generationError}
+              </div>
+            )}
+            {hasGeneratedContent && (
+              <p role="status" className="text-emerald-800 font-semibold">
+                Taslak hazır. Metni ve 10 sorunun tamamını inceleyip düzenleyin; onay vermeden kaydedilmez.
+              </p>
+            )}
+            <Button
+              type="button"
+              variant="amber"
+              size="sm"
+              onClick={() => void handleGenerateContent()}
+              isLoading={isGenerating}
+              disabled={isSaving}
+            >
+              {isGenerating ? "Metin ve sorular hazırlanıyor..." : "Metni ve 10 Soruyu Oluştur"}
+            </Button>
           </div>
 
           {/* Bölüm 2: Okuma Metni */}

@@ -112,6 +112,23 @@ export async function savePlacementExamPackageToDatabase(input: {
   await batch.commit();
 }
 
+export async function deletePlacementExamPackageFromDatabase(exam: PlacementExam): Promise<void> {
+  assertFirebaseConfigured();
+  const [existingQuestions, examsUsingPassage] = await Promise.all([
+    getDocs(query(collection(db, "placementQuestions"), where("examId", "==", exam.code))),
+    getDocs(query(collection(db, "placementExams"), where("passageId", "==", exam.passageId))),
+  ]);
+  const batch = writeBatch(db);
+
+  batch.delete(doc(db, "placementExams", exam.code));
+  if (examsUsingPassage.docs.every((otherExam) => otherExam.id === exam.code)) {
+    batch.delete(doc(db, "placementPassages", exam.passageId));
+  }
+  existingQuestions.docs.forEach((question) => batch.delete(question.ref));
+
+  await batch.commit();
+}
+
 /**
  * Kullanıcının eğitim kademesine göre uygun başlangıç sınavını getirir.
  */
