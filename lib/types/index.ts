@@ -340,6 +340,7 @@ export interface PlacementPassage {
   content: string;
   wordCount: number;
   educationLevels: EducationLevel[];
+  learningStage?: LearningStage;
   ageGroups: string[];
   difficulty: DifficultyLevel;
   genre: string;
@@ -357,6 +358,7 @@ export interface PlacementExam {
   code: string; // örn: "ilk-okul-baslangic-01"
   description: string;
   educationLevels: EducationLevel[];
+  learningStage?: LearningStage;
   ageGroups: string[];
   targetSkills: string[];
   passageId: string;

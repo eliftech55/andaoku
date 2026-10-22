@@ -8,6 +8,7 @@ import {
   PlacementPassage,
   PlacementQuestion,
   EducationLevel,
+  LearningStage,
   ContentStatus,
   PlacementQuestionCategory,
 } from "@/lib/types";
@@ -37,6 +38,16 @@ import {
   BookOpen,
 } from "lucide-react";
 
+const learningStages: { value: LearningStage; label: string }[] = [
+  { value: "placement_exam", label: "Başlangıç sınavı" },
+  { value: "exercises", label: "Alıştırmalar" },
+  { value: "module_1", label: "Modül 1" },
+  { value: "module_2", label: "Modül 2" },
+  { value: "module_3", label: "Modül 3" },
+  { value: "module_4", label: "Modül 4" },
+  { value: "module_5", label: "Modül 5" },
+];
+
 export default function BaslangicSinavlariYonetimPage() {
   const { profile } = useAuth();
 
@@ -54,7 +65,8 @@ export default function BaslangicSinavlariYonetimPage() {
   const [formExamTitle, setFormExamTitle] = useState("");
   const [formExamCode, setFormExamCode] = useState("");
   const [formDescription, setFormDescription] = useState("");
-  const [formLevel, setFormLevel] = useState<EducationLevel>("middle");
+  const [formStage, setFormStage] = useState<LearningStage>("placement_exam");
+  const [formEducationLevels, setFormEducationLevels] = useState<EducationLevel[]>(["middle"]);
   const [formStatus, setFormStatus] = useState<ContentStatus>("published");
 
   // Metin State
@@ -121,14 +133,15 @@ export default function BaslangicSinavlariYonetimPage() {
     }
   }
 
-  // Yeni Sınav Formunu Aç
+  // Yeni içerik paketini aç
   const handleOpenNew = () => {
     setEditingExamCode(null);
     setFormExamTitle("");
     const newCode = "sinav-" + Date.now();
     setFormExamCode(newCode);
-    setFormDescription("Yeni başlangıç okuma ve anlama seviye tespit sınavı.");
-    setFormLevel("middle");
+    setFormDescription("Yeni okuma ve anlama içerik paketi.");
+    setFormStage("placement_exam");
+    setFormEducationLevels(["middle"]);
     setFormStatus("draft");
 
     setFormPassageTitle("");
@@ -148,7 +161,8 @@ export default function BaslangicSinavlariYonetimPage() {
     setFormExamTitle(exam.title);
     setFormExamCode(exam.code);
     setFormDescription(exam.description);
-    setFormLevel(exam.educationLevels[0] || "middle");
+    setFormStage(exam.learningStage || "placement_exam");
+    setFormEducationLevels(exam.educationLevels?.length ? exam.educationLevels : ["middle"]);
     setFormStatus(exam.status);
 
     setLoadError(null);
@@ -288,9 +302,15 @@ export default function BaslangicSinavlariYonetimPage() {
       title: formPassageTitle,
       content: formPassageContent,
       wordCount,
-      educationLevels: [formLevel],
+      educationLevels: formEducationLevels,
+      learningStage: formStage,
       ageGroups: ["all"],
-      difficulty: formLevel === "primary" ? "beginner" : formLevel === "middle" ? "intermediate" : "advanced",
+      difficulty:
+        formEducationLevels[0] === "primary"
+          ? "beginner"
+          : formEducationLevels[0] === "middle"
+            ? "intermediate"
+            : "advanced",
       genre: formGenre,
       topic: formTopic || "Genel Kültür",
       version: 1,
@@ -305,7 +325,8 @@ export default function BaslangicSinavlariYonetimPage() {
       code: formExamCode,
       title: formExamTitle,
       description: formDescription,
-      educationLevels: [formLevel],
+      educationLevels: formEducationLevels,
+      learningStage: formStage,
       ageGroups: ["all"],
       targetSkills: ["ana_fikir", "cikarim_yapma", "acik_bilgi"],
       passageId,
@@ -350,12 +371,12 @@ export default function BaslangicSinavlariYonetimPage() {
       {/* Üst Başlık ve Eylemler */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-sage-200">
         <div>
-          <Badge variant="amber" className="mb-1">İçerik Yönetim Modülü</Badge>
+          <Badge variant="amber" className="mb-1">İçerik Yönetimi</Badge>
           <h1 className="text-3xl font-extrabold font-serif text-charcoal">
-            Başlangıç Sınavı Yönetimi
+            İçerik Yönetimi
           </h1>
           <p className="text-xs sm:text-sm text-charcoal-muted">
-            5 eğitim kademesi için seviye belirleme metinlerini ve 1-10 soruluk test paketlerini yönetin.
+            İçerikleri metin ve soru paketi olarak ekleyin; başlangıç sınavı, alıştırmalar veya modül seviyesini seçin.
           </p>
         </div>
 
@@ -366,7 +387,7 @@ export default function BaslangicSinavlariYonetimPage() {
             </Button>
           </Link>
           <Button size="sm" variant="amber" onClick={handleOpenNew}>
-            <Plus className="mr-1.5 h-4 w-4" /> Yeni Sınav Paketi Ekle
+            <Plus className="mr-1.5 h-4 w-4" /> İçerik Ekle
           </Button>
         </div>
       </div>
@@ -374,7 +395,7 @@ export default function BaslangicSinavlariYonetimPage() {
       {saveSuccessNotice && (
         <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
           <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-          <span>Sınav paketi, metin ve {formQuestions.length} soru başarıyla doğrulandı ve kaydedildi.</span>
+          <span>İçerik paketi, metin ve {formQuestions.length} soru başarıyla doğrulandı ve kaydedildi.</span>
         </div>
       )}
 
@@ -386,7 +407,7 @@ export default function BaslangicSinavlariYonetimPage() {
 
       {saveError && (
         <div role="alert" className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs">
-          Sınav paketi kaydedilemedi: {saveError}
+          İçerik paketi kaydedilemedi: {saveError}
         </div>
       )}
 
@@ -396,9 +417,9 @@ export default function BaslangicSinavlariYonetimPage() {
           <table className="w-full text-left text-xs">
             <thead className="bg-ivory-warm border-b border-sage-200 text-charcoal font-semibold">
               <tr>
-                <th className="p-3.5">Sınav Adı</th>
+                <th className="p-3.5">İçerik Adı</th>
                 <th className="p-3.5">Kod</th>
-                <th className="p-3.5">Kademe</th>
+                <th className="p-3.5">Seviye</th>
                 <th className="p-3.5">Soru Sayısı</th>
                 <th className="p-3.5">Tahmini Süre</th>
                 <th className="p-3.5">Yayın Durumu</th>
@@ -409,13 +430,13 @@ export default function BaslangicSinavlariYonetimPage() {
               {loading ? (
                 <tr>
                   <td colSpan={7} className="p-8 text-center text-charcoal-muted">
-                    Sınavlar veritabanından yükleniyor...
+                    İçerikler veritabanından yükleniyor...
                   </td>
                 </tr>
               ) : exams.length === 0 && !loadError ? (
                 <tr>
                   <td colSpan={7} className="p-8 text-center text-charcoal-muted">
-                    Veritabanında henüz başlangıç sınavı bulunmuyor. Yeni sınav paketi ekleyerek başlayın.
+                    Henüz içerik paketi bulunmuyor. Yeni içerik ekleyerek başlayın.
                   </td>
                 </tr>
               ) : exams.map((ex) => (
@@ -424,7 +445,7 @@ export default function BaslangicSinavlariYonetimPage() {
                   <td className="p-3.5 font-mono text-[11px] text-charcoal-muted">{ex.code}</td>
                   <td className="p-3.5 capitalize">
                     <Badge variant="secondary" className="text-[10px]">
-                      {ex.educationLevels.join(", ")}
+                      {learningStages.find((stage) => stage.value === (ex.learningStage || "placement_exam"))?.label}
                     </Badge>
                   </td>
                   <td className="p-3.5 font-mono font-semibold text-brand-900">
@@ -457,8 +478,8 @@ export default function BaslangicSinavlariYonetimPage() {
       <Modal
         isOpen={editorModalOpen}
         onClose={() => setEditorModalOpen(false)}
-        title={editingExamCode ? "Sınav Paketini Düzenle" : "Yeni Başlangıç Sınavı Oluştur"}
-        description="Özgün metin ve 1-10 arasında çoktan seçmeli soru (A, B, C, D) yapılandırın."
+        title={editingExamCode ? "İçerik Paketini Düzenle" : "Yeni İçerik Paketi Oluştur"}
+        description="Metni ve 1-10 arasında çoktan seçmeli soruyu (A, B, C, D) birlikte yapılandırın."
         maxWidth="xl"
         footer={
           <div className="flex gap-2">
@@ -493,24 +514,24 @@ export default function BaslangicSinavlariYonetimPage() {
             </div>
           )}
 
-          {/* Bölüm 1: Sınav Genel Bilgileri */}
+          {/* Bölüm 1: İçerik Genel Bilgileri */}
           <div className="p-4 rounded-2xl bg-ivory-warm border border-sage-200 space-y-3">
             <h4 className="font-bold text-charcoal text-sm flex items-center gap-1.5">
-              <Layers className="h-4 w-4 text-brand-700" /> Sınav Genel Ayarları
+              <Layers className="h-4 w-4 text-brand-700" /> İçerik Genel Ayarları
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="sm:col-span-2">
-                <label className="font-semibold block mb-1">Sınav Adı</label>
+                <label className="font-semibold block mb-1">İçerik Adı</label>
                 <input
                   type="text"
                   value={formExamTitle}
                   onChange={(e) => setFormExamTitle(e.target.value)}
-                  placeholder="Örn: Ortaokul Başlangıç Seviye Tespit Sınavı"
+                  placeholder="Örn: Okuma ve Anlama Paketi"
                   className="w-full p-2.5 rounded-xl border border-sage-200 bg-white"
                 />
               </div>
               <div>
-                <label className="font-semibold block mb-1">Sınav Kodu (Benzersiz)</label>
+                <label className="font-semibold block mb-1">İçerik Kodu (Benzersiz)</label>
                 <input
                   type="text"
                   value={formExamCode}
@@ -520,17 +541,17 @@ export default function BaslangicSinavlariYonetimPage() {
                 />
               </div>
               <div>
-                <label className="font-semibold block mb-1">Hedef Eğitim Kademesi</label>
+                <label className="font-semibold block mb-1">Seviye</label>
                 <select
-                  value={formLevel}
-                  onChange={(e) => setFormLevel(e.target.value as EducationLevel)}
+                  value={formStage}
+                  onChange={(e) => setFormStage(e.target.value as LearningStage)}
                   className="w-full p-2 rounded-xl border border-sage-200 bg-white"
                 >
-                  <option value="primary">İlkokul</option>
-                  <option value="middle">Ortaokul</option>
-                  <option value="high">Lise</option>
-                  <option value="university">Üniversite</option>
-                  <option value="adult">Yetişkin</option>
+                  {learningStages.map((stage) => (
+                    <option key={stage.value} value={stage.value}>
+                      {stage.label}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>

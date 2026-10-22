@@ -121,8 +121,11 @@ export async function getPlacementExamByLevel(
   const allExams = await getAllPlacementExams();
   // Yayınlanmış ve eğitim kademesini içeren sınavı bul
   const matchingExam = allExams.find(
-    (e) => e.status === "published" && e.educationLevels.includes(educationLevel)
-  ) || allExams[0];
+    (e) =>
+      e.status === "published" &&
+      (e.learningStage === undefined || e.learningStage === "placement_exam") &&
+      e.educationLevels.includes(educationLevel)
+  );
 
   if (!matchingExam) return null;
 
