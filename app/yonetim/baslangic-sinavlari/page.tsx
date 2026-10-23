@@ -51,6 +51,18 @@ const learningStages: { value: LearningStage; label: string }[] = [
   { value: "module_5", label: "Modül 5" },
 ];
 
+const GENERATION_POLL_INTERVAL_MS = 10000;
+const MAX_GENERATION_POLL_ATTEMPTS = 60;
+
+function getApiErrorMessage(body: unknown, fallback: string): string {
+  return typeof body === "object" &&
+    body !== null &&
+    "error" in body &&
+    typeof body.error === "string"
+    ? body.error
+    : fallback;
+}
+
 export default function BaslangicSinavlariYonetimPage() {
   const { profile, user } = useAuth();
 
@@ -215,16 +227,47 @@ export default function BaslangicSinavlariYonetimPage() {
       });
       const responseBody: unknown = await response.json();
       if (!response.ok) {
-        const message =
-          typeof responseBody === "object" &&
-          responseBody !== null &&
-          "error" in responseBody &&
-          typeof responseBody.error === "string"
-            ? responseBody.error
-            : "Yapay zekâ içerik üretemedi.";
-        throw new Error(message);
+        throw new Error(getApiErrorMessage(responseBody, "Yapay zekâ içerik üretemedi."));
       }
-      const result = generatedContentSchema.parse(responseBody);
+      if (
+        typeof responseBody !== "object" ||
+        responseBody === null ||
+        !("interactionId" in responseBody) ||
+        typeof responseBody.interactionId !== "string"
+      ) {
+        throw new Error("Gemini içerik üretim görevi başlatılamadı.");
+      }
+
+      let generatedResponse: unknown;
+      let cleanupWarning = false;
+      for (let attempt = 0; attempt < MAX_GENERATION_POLL_ATTEMPTS; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, GENERATION_POLL_INTERVAL_MS));
+        const statusResponse = await fetch(
+          `/api/admin/generate-content?interactionId=${encodeURIComponent(responseBody.interactionId)}`,
+          {
+            headers: { Authorization: `Bearer ${idToken}` },
+            cache: "no-store",
+          }
+        );
+        if (statusResponse.status === 202) continue;
+
+        const statusBody: unknown = await statusResponse.json();
+        if (!statusResponse.ok) {
+          throw new Error(getApiErrorMessage(statusBody, "Gemini içerik üretemedi."));
+        }
+        generatedResponse = statusBody;
+        cleanupWarning = statusResponse.headers.get("X-Gemini-Interaction-Cleanup") === "failed";
+        break;
+      }
+      if (generatedResponse === undefined) {
+        throw new Error("Gemini üretimi beklenenden uzun sürüyor. Lütfen daha sonra tekrar deneyin.");
+      }
+      const result = generatedContentSchema.parse(generatedResponse);
+      if (cleanupWarning) {
+        setGenerationError(
+          "İçerik oluşturuldu ancak Google’daki geçici kayıt otomatik silinemedi. Lütfen destek ekibiyle iletişime geçin."
+        );
+      }
 
       const generatedExamCode = editingExamCode || formExamCode;
       const now = new Date().toISOString();
@@ -751,8 +794,13 @@ export default function BaslangicSinavlariYonetimPage() {
               isLoading={isGenerating}
               disabled={isSaving}
             >
-              {isGenerating ? "Metin ve sorular hazırlanıyor..." : "Metni ve 10 Soruyu Oluştur"}
+              {isGenerating ? "Gemini içerik üzerinde çalışıyor..." : "Metni ve 10 Soruyu Oluştur"}
             </Button>
+            {isGenerating && (
+              <p role="status" className="text-xs text-charcoal-muted">
+                Üretim arka planda sürüyor; lütfen bu sayfayı açık tutun.
+              </p>
+            )}
           </div>
 
           {/* Bölüm 2: Okuma Metni */}

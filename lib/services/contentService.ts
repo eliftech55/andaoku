@@ -27,6 +27,7 @@ import {
   EducationLevel,
   DifficultyLevel,
 } from "../types";
+import { getPublishedPlacementPackagesByStage } from "./placementExamService";
 
 export async function fetchAllModules(): Promise<LearningModule[]> {
   try {
@@ -57,6 +58,55 @@ export async function fetchPassages(
     filtered = filtered.filter((p) => p.difficulty === difficulty);
   }
   return filtered;
+}
+
+export async function fetchExerciseContent(): Promise<
+  { passage: ReadingPassage; questions: Question[] }[]
+> {
+  const packages = await getPublishedPlacementPackagesByStage("exercises");
+
+  return packages.map(({ exam, passage, questions }) => ({
+    passage: {
+      id: passage.id,
+      title: passage.title,
+      content: passage.content,
+      wordCount: passage.wordCount,
+      educationLevels: passage.educationLevels,
+      learningStage: "exercises",
+      ageGroups: passage.ageGroups,
+      difficulty: passage.difficulty,
+      genre:
+        passage.genre === "bilgilendirici" ||
+        passage.genre === "oykuleyici" ||
+        passage.genre === "aciklayici" ||
+        passage.genre === "akademik" ||
+        passage.genre === "diger"
+          ? passage.genre
+          : "diger",
+      topic: passage.topic,
+      targetSkills: exam.targetSkills,
+      estimatedReadingTime: exam.estimatedReadingSeconds,
+      status: exam.status,
+      version: passage.version,
+      createdBy: passage.createdBy,
+      createdAt: passage.createdAt,
+      updatedAt: passage.updatedAt,
+      publishedAt: exam.publishedAt,
+    },
+    questions: questions.map((question) => ({
+      id: question.id,
+      passageId: passage.id,
+      passageVersion: question.passageVersion,
+      questionType: "multiple_choice",
+      prompt: question.questionText,
+      options: question.options,
+      correctAnswer: question.correctOptionId,
+      points: question.points,
+      explanation: question.explanation,
+      targetSkill: question.questionType,
+      status: question.status,
+    })),
+  }));
 }
 
 export async function fetchPassageById(id: string): Promise<ReadingPassage | null> {

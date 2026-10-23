@@ -11,9 +11,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@ai-sdk/google": "^4.0.102",
+    "@google/genai": "^2.31.0",
     "@hookform/resolvers": "^3.9.0",
-    "ai": "^7.0.148",
     "clsx": "^2.1.1",
     "firebase": "^10.14.1",
     "firebase-admin": "^12.6.0",

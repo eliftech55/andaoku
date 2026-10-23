@@ -4,11 +4,20 @@ import React, { Suspense, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { ReadingLab } from "@/components/reading/ReadingLab";
 import { VisualAttentionGame } from "@/components/activities/VisualAttentionGame";
+import {
+  EyeMovementExercise,
+  EyeMovementExerciseType,
+} from "@/components/activities/EyeMovementExercise";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { BookOpen, Target, Sparkles, Layers, RefreshCw } from "lucide-react";
-import { fetchActivities, fetchPassageById, fetchPassages, fetchQuestionsForPassage } from "@/lib/services/contentService";
+import {
+  fetchActivities,
+  fetchExerciseContent,
+  fetchPassageById,
+  fetchQuestionsForPassage,
+} from "@/lib/services/contentService";
 import { upsertUserProgress } from "@/lib/firebase/firestore";
 import { useAuth } from "@/contexts/AuthContext";
 import { Activity, ReadingPassage, Question } from "@/lib/types";
@@ -34,9 +43,14 @@ function OkumaLaboratuvariContent() {
 
   const [activeTab, setActiveTab] = useState<"reader" | "minigame">(initialTab);
   const [passages, setPassages] = useState<ReadingPassage[]>([]);
+  const [exerciseContents, setExerciseContents] = useState<
+    { passage: ReadingPassage; questions: Question[] }[]
+  >([]);
   const [selectedPassage, setSelectedPassage] = useState<ReadingPassage | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
+  const [selectedEyeExercise, setSelectedEyeExercise] =
+    useState<"matrix" | EyeMovementExerciseType>("matrix");
   const [requestedModuleId, setRequestedModuleId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -55,7 +69,8 @@ function OkumaLaboratuvariContent() {
         const activity = activityList.find((item) => item.id === activityId) || null;
         if (active) setSelectedActivity(activity);
 
-        const list = await fetchPassages();
+        const exerciseList = await fetchExerciseContent();
+        const list = exerciseList.map((content) => content.passage);
         const requestedPassageId = activity?.contentConfig.passageId || searchParams.get("passageId");
         let target: ReadingPassage | null = requestedPassageId
           ? list.find((passage) => passage.id === requestedPassageId) || null
@@ -64,13 +79,17 @@ function OkumaLaboratuvariContent() {
           target = await fetchPassageById(requestedPassageId);
         }
         if (!active) return;
+        setExerciseContents(exerciseList);
         setPassages(moduleId ? (target ? [target] : []) : list);
         setSelectedPassage(target);
         if (!target) {
           setQuestions([]);
           return;
         }
-        const qList = await fetchQuestionsForPassage(target.id);
+        const exerciseContent = exerciseList.find((content) => content.passage.id === target.id);
+        const qList = exerciseContent
+          ? exerciseContent.questions
+          : await fetchQuestionsForPassage(target.id);
         if (active) setQuestions(qList);
       } catch (e) {
         console.error("Okuma laboratuvarı içeriği yüklenemedi:", e);
@@ -87,7 +106,10 @@ function OkumaLaboratuvariContent() {
 
   const handlePassageSelect = async (p: ReadingPassage) => {
     setSelectedPassage(p);
-    const qList = await fetchQuestionsForPassage(p.id);
+    const exerciseContent = exerciseContents.find((content) => content.passage.id === p.id);
+    const qList = exerciseContent
+      ? exerciseContent.questions
+      : await fetchQuestionsForPassage(p.id);
     setQuestions(qList);
   };
 
@@ -149,7 +171,7 @@ function OkumaLaboratuvariContent() {
             }`}
           >
             <Target className="h-4 w-4 text-amber-600" />
-            Görsel Dikkat Matrisi
+            Göz Egzersizleri
           </button>
         </div>
       </div>
@@ -201,15 +223,61 @@ function OkumaLaboratuvariContent() {
           </div>
         )
       ) : (
-        <VisualAttentionGame
-          key={selectedActivity?.id || "default-visual-exercise"}
-          targetSymbol={selectedActivity?.contentConfig.targetSymbol}
-          gridSize={selectedActivity?.contentConfig.gridSize}
-          timeLimitSeconds={selectedActivity?.contentConfig.timeLimitSeconds}
-          title={selectedActivity?.title}
-          instructions={selectedActivity?.instructions}
-          onComplete={handleVisualExerciseComplete}
-        />
+        <div className="space-y-6">
+          <div className="grid gap-3 sm:grid-cols-3" aria-label="Göz egzersizi seçin">
+            {[
+              {
+                id: "matrix" as const,
+                title: "Görsel Dikkat Matrisi",
+                description: "Matris içindeki hedef sembolleri bulun.",
+              },
+              {
+                id: "tracking" as const,
+                title: "Hareketli Hedefi İzle",
+                description: "Ekranda konum değiştiren hedefi takip edin.",
+              },
+              {
+                id: "saccade" as const,
+                title: "Sakkadik Sağ-Sol Bakış",
+                description: "Hedefi iki farklı tarafta bulup bakışınızı değiştirin.",
+              },
+            ].map((exercise) => (
+              <button
+                key={exercise.id}
+                type="button"
+                aria-pressed={selectedEyeExercise === exercise.id}
+                onClick={() => setSelectedEyeExercise(exercise.id)}
+                className={`rounded-2xl border p-4 text-left transition-colors ${
+                  selectedEyeExercise === exercise.id
+                    ? "border-brand-700 bg-brand-50 shadow-sm"
+                    : "border-sage-200 bg-white hover:bg-ivory-warm"
+                }`}
+              >
+                <span className="block text-sm font-bold text-charcoal">{exercise.title}</span>
+                <span className="mt-1 block text-xs text-charcoal-muted">
+                  {exercise.description}
+                </span>
+                <span className="mt-3 inline-block rounded-full bg-sage-100 px-2.5 py-1 text-[10px] font-semibold text-charcoal">
+                  5 seviye · Kolaydan zora
+                </span>
+              </button>
+            ))}
+          </div>
+          {selectedEyeExercise === "matrix" ? (
+            <VisualAttentionGame
+              key={`${selectedActivity?.id || "default"}-matrix`}
+              targetSymbol={selectedActivity?.contentConfig.targetSymbol}
+              instructions={selectedActivity?.instructions}
+              onComplete={handleVisualExerciseComplete}
+            />
+          ) : (
+            <EyeMovementExercise
+              key={selectedEyeExercise}
+              type={selectedEyeExercise}
+              onComplete={handleVisualExerciseComplete}
+            />
+          )}
+        </div>
       )}
     </div>
   );

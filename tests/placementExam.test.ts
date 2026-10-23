@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   SEED_PLACEMENT_EXAMS,
   SEED_PLACEMENT_PASSAGES,
@@ -7,7 +7,7 @@ import {
 import {
   getStudentPlacementQuestions,
   evaluatePlacementAttempt,
-  getPlacementExamByLevel,
+  getRandomPlacementExam,
 } from "../lib/services/placementExamService";
 import { countTurkishWords, calculateWpm, calculateComprehensionScore } from "../lib/utils/readingMetrics";
 import { EducationLevel } from "../lib/types";
@@ -105,14 +105,22 @@ describe("AndaOku — Başlangıç Sınavı ve Seviye Belirleme Test Paketi", ()
     expect(result.attempt.questionDurationSeconds).toBe(90);
   });
 
-  it("Tüm 5 eğitim kademesine göre doğru metin ve sınav eşleşmelidir", async () => {
-    const levels: EducationLevel[] = ["primary", "middle", "high", "university", "adult"];
-    for (const lvl of levels) {
-      const match = await getPlacementExamByLevel(lvl);
+  it("Eğitim kademesinden bağımsız olarak yayımlanmış başlangıç sınavlarından rastgele birini seçmelidir", async () => {
+    const random = vi.spyOn(Math, "random").mockReturnValue(0.999);
+    try {
+      const match = await getRandomPlacementExam();
+      const eligibleExams = SEED_PLACEMENT_EXAMS.filter(
+        (exam) =>
+          exam.status === "published" &&
+          (exam.learningStage === undefined || exam.learningStage === "placement_exam")
+      );
+
       expect(match).not.toBeNull();
-      expect(match?.exam.educationLevels).toContain(lvl);
+      expect(match?.exam.code).toBe(eligibleExams[eligibleExams.length - 1].code);
       expect(match?.passage.id).toBe(match?.exam.passageId);
       expect(match?.passage.wordCount).toBeGreaterThan(50);
+    } finally {
+      random.mockRestore();
     }
   });
 
@@ -139,4 +147,3 @@ describe("AndaOku — Başlangıç Sınavı ve Seviye Belirleme Test Paketi", ()
     expect(totalByLetter["D"]).toBeGreaterThanOrEqual(8);
   });
 });
-

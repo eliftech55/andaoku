@@ -10,7 +10,7 @@ import {
   PlacementAttempt,
 } from "@/lib/types";
 import {
-  getPlacementExamByLevel,
+  getRandomPlacementExam,
   getStudentPlacementQuestions,
   evaluatePlacementAttempt,
   getUserPlacementAttempts,
@@ -80,11 +80,10 @@ export function PlacementExamFlow() {
 
   useEffect(() => {
     async function loadExam() {
-      const level = profile?.educationLevel || "middle";
       const uid = user?.uid || profile?.uid || "demo-learner-123";
 
       try {
-        const examData = await getPlacementExamByLevel(level);
+        const examData = await getRandomPlacementExam();
         if (examData) {
           setExam(examData.exam);
           setPassage(examData.passage);
@@ -189,7 +188,7 @@ export function PlacementExamFlow() {
         <AlertCircle className="h-10 w-10 text-amber-600 mx-auto" />
         <h3 className="text-base font-bold text-charcoal">Uygun Sınav Metni Bulunamadı</h3>
         <p className="text-xs text-charcoal-muted max-w-md mx-auto">
-          Eğitim kademeniz ({profile?.educationLevel || "ortaokul"}) için yayımlanmış başlangıç sınavı bulunamadı. Lütfen yönetim panelinden sınavın yayında olduğunu kontrol edin.
+          Yayımlanmış başlangıç sınavı içeriği bulunamadı. Lütfen yönetim panelinden başlangıç sınavı olarak işaretlenmiş içeriğin yayında olduğunu kontrol edin.
         </p>
       </div>
     );

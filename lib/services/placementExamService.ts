@@ -10,7 +10,7 @@ import {
   PlacementAttempt,
   PlacementResponse,
   PlacementProfile,
-  EducationLevel,
+  LearningStage,
 } from "../types";
 import {
   SEED_PLACEMENT_EXAMS,
@@ -130,26 +130,54 @@ export async function deletePlacementExamPackageFromDatabase(exam: PlacementExam
 }
 
 /**
- * Kullanıcının eğitim kademesine göre uygun başlangıç sınavını getirir.
+ * Yayınlanmış başlangıç sınavlarından rastgele bir paket getirir.
  */
-export async function getPlacementExamByLevel(
-  educationLevel: EducationLevel
-): Promise<{ exam: PlacementExam; passage: PlacementPassage } | null> {
+export async function getRandomPlacementExam(): Promise<{
+  exam: PlacementExam;
+  passage: PlacementPassage;
+} | null> {
   const allExams = await getAllPlacementExams();
-  // Yayınlanmış ve eğitim kademesini içeren sınavı bul
-  const matchingExam = allExams.find(
+  const placementExams = allExams.filter(
     (e) =>
       e.status === "published" &&
-      (e.learningStage === undefined || e.learningStage === "placement_exam") &&
-      e.educationLevels.includes(educationLevel)
+      (e.learningStage === undefined || e.learningStage === "placement_exam")
   );
 
-  if (!matchingExam) return null;
+  if (placementExams.length === 0) return null;
 
+  const matchingExam = placementExams[Math.floor(Math.random() * placementExams.length)];
   const passage = await getPlacementPassageById(matchingExam.passageId);
   if (!passage) return null;
 
   return { exam: matchingExam, passage };
+}
+
+export async function getPublishedPlacementPackagesByStage(
+  learningStage: LearningStage
+): Promise<
+  {
+    exam: PlacementExam;
+    passage: PlacementPassage;
+    questions: PlacementQuestion[];
+  }[]
+> {
+  const exams = (await getAllPlacementExams()).filter(
+    (exam) => exam.status === "published" && exam.learningStage === learningStage
+  );
+
+  const packages = await Promise.all(
+    exams.map(async (exam) => {
+      const [passage, questions] = await Promise.all([
+        getPlacementPassageById(exam.passageId),
+        getQuestionsByExamCode(exam.code),
+      ]);
+      return passage ? { exam, passage, questions } : null;
+    })
+  );
+
+  return packages.filter(
+    (content): content is NonNullable<typeof content> => content !== null
+  );
 }
 
 /**

@@ -10,58 +10,56 @@ import { Play, RotateCcw, Target, Trophy, Clock, CheckCircle, AlertTriangle } fr
 interface VisualAttentionGameProps {
   onComplete?: (score: { accuracy: number; totalFound: number; timeSeconds: number }) => void;
   targetSymbol?: string;
-  gridSize?: number;
-  timeLimitSeconds?: number;
   title?: string;
   instructions?: string;
 }
 
+const LEVELS = [
+  { level: 1, label: "Başlangıç", gridSize: 4, targetCount: 4, seconds: 60, distractorCount: 3 },
+  { level: 2, label: "Kolay", gridSize: 5, targetCount: 6, seconds: 50, distractorCount: 4 },
+  { level: 3, label: "Orta", gridSize: 6, targetCount: 9, seconds: 40, distractorCount: 5 },
+  { level: 4, label: "Zor", gridSize: 7, targetCount: 12, seconds: 35, distractorCount: 6 },
+  { level: 5, label: "Uzman", gridSize: 8, targetCount: 16, seconds: 30, distractorCount: 7 },
+] as const;
+
 export function VisualAttentionGame({
   onComplete,
   targetSymbol = "★",
-  gridSize: requestedGridSize = 6,
-  timeLimitSeconds = 25,
-  title = "Hedef Sembolü Bulma Matrisi",
+  title = "Görsel Dikkat Matrisi",
   instructions,
 }: VisualAttentionGameProps) {
-  const symbols = ["★", "▲", "●", "◆", "■", "✿", "✦", "✪"];
-  const gridSize = Math.min(8, Math.max(3, Math.floor(requestedGridSize)));
-  const gameDuration = Math.min(120, Math.max(10, Math.floor(timeLimitSeconds)));
+  const [selectedLevel, setSelectedLevel] = useState(1);
+  const levelConfig = LEVELS[selectedLevel - 1];
+  const symbols = ["▲", "●", "◆", "■", "✿", "✦", "✪"].slice(
+    0,
+    levelConfig.distractorCount
+  );
+  const { gridSize, targetCount, seconds: gameDuration } = levelConfig;
 
   const [gameState, setGameState] = useState<"idle" | "playing" | "finished">("idle");
   const [grid, setGrid] = useState<string[]>([]);
   const [clickedIndices, setClickedIndices] = useState<Set<number>>(new Set());
   const [wrongIndices, setWrongIndices] = useState<Set<number>>(new Set());
-  const [timeLeft, setTimeLeft] = useState(gameDuration);
+  const [timeLeft, setTimeLeft] = useState<number>(gameDuration);
   const [totalTargets, setTotalTargets] = useState(0);
   const completionReported = useRef(false);
   const accuracy = totalTargets > 0 ? Math.round((clickedIndices.size / totalTargets) * 100) : 0;
 
   // Yeni matris üret
   const generateGrid = () => {
-    const newGrid: string[] = [];
-    let targetCount = 0;
-    for (let i = 0; i < gridSize * gridSize; i++) {
-      // %25 ihtimalle hedef sembol
-      if (Math.random() < 0.28) {
-        newGrid.push(targetSymbol);
-        targetCount++;
-      } else {
-        const distractors = symbols.filter((s) => s !== targetSymbol);
-        const randomDistractor = distractors[Math.floor(Math.random() * distractors.length)];
-        newGrid.push(randomDistractor);
-      }
+    const totalCells = gridSize * gridSize;
+    const targetIndices = new Set<number>();
+    while (targetIndices.size < targetCount) {
+      targetIndices.add(Math.floor(Math.random() * totalCells));
     }
-    // En az 4 hedef olduğundan emin ol
-    if (targetCount < Math.min(4, gridSize * gridSize)) {
-      const minimumTargets = Math.min(4, gridSize * gridSize);
-      for (let index = 0; index < minimumTargets; index++) {
-        newGrid[index] = targetSymbol;
-      }
-      targetCount = minimumTargets;
-    }
+    const distractors = symbols.filter((symbol) => symbol !== targetSymbol);
+    const newGrid = Array.from({ length: totalCells }, (_, index) =>
+      targetIndices.has(index)
+        ? targetSymbol
+        : distractors[Math.floor(Math.random() * distractors.length)]
+    );
     setGrid(newGrid);
-    setTotalTargets(targetCount);
+    setTotalTargets(targetIndices.size);
     setClickedIndices(new Set());
     setWrongIndices(new Set());
     setTimeLeft(gameDuration);
@@ -129,7 +127,7 @@ export function VisualAttentionGame({
         <div className="flex items-center justify-between">
           <Badge variant="amber" className="flex items-center gap-1">
             <Target className="h-3 w-3" />
-            Modül 2: Görsel Tarama & Odaklanma
+            Görsel Dikkat
           </Badge>
           {gameState === "playing" && (
             <div className="flex items-center gap-1 text-xs font-mono font-bold text-amber-700">
@@ -141,6 +139,33 @@ export function VisualAttentionGame({
         <CardTitle className="text-xl font-serif text-charcoal mt-1">{title}</CardTitle>
         <p className="text-xs text-charcoal-muted">
           {instructions || <>Gözün tarama hızını ve çevresel görsel dikkatini geliştirin. Tabloda gördüğünüz tüm <strong>{targetSymbol}</strong> sembollerine olabildiğince hızlı tıklayın.</>}
+        </p>
+        <div className="flex flex-wrap gap-2 pt-2" aria-label="Alıştırma seviyesi">
+          {LEVELS.map((level) => (
+            <button
+              key={level.level}
+              type="button"
+              disabled={gameState === "playing"}
+              aria-pressed={selectedLevel === level.level}
+              onClick={() => {
+                setSelectedLevel(level.level);
+                setGameState("idle");
+                setClickedIndices(new Set());
+                setWrongIndices(new Set());
+                setTimeLeft(level.seconds);
+              }}
+              className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                selectedLevel === level.level
+                  ? "border-brand-800 bg-brand-700 text-white"
+                  : "border-sage-200 bg-white text-charcoal hover:bg-ivory-beige"
+              }`}
+            >
+              {level.level}. Seviye · {level.label}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-charcoal-muted">
+          Seviye {levelConfig.level}: {gridSize}×{gridSize} matris, {targetCount} hedef, {gameDuration} saniye
         </p>
       </CardHeader>
 
@@ -173,7 +198,7 @@ export function VisualAttentionGame({
             <Progress value={((gameDuration - timeLeft) / gameDuration) * 100} color="amber" />
 
             {/* Matris Izgarası */}
-            <div className="grid gap-2 rounded-2xl border border-sage-200 bg-ivory-warm p-3" style={{ gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))` }}>
+            <div className="grid gap-1.5 rounded-2xl border border-sage-200 bg-ivory-warm p-2 sm:gap-2 sm:p-3" style={{ gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))` }}>
               {grid.map((symbol, idx) => {
                 const isCorrect = clickedIndices.has(idx);
                 const isWrong = wrongIndices.has(idx);
@@ -182,7 +207,7 @@ export function VisualAttentionGame({
                   <button
                     key={idx}
                     onClick={() => handleCellClick(idx)}
-                    className={`h-12 w-full flex items-center justify-center text-xl font-bold rounded-xl transition-all duration-150 select-none ${
+                    className={`h-10 w-full flex items-center justify-center text-lg font-bold rounded-xl transition-all duration-150 select-none sm:h-12 sm:text-xl ${
                       isCorrect
                         ? "bg-emerald-600 text-white shadow-md scale-95"
                         : isWrong
@@ -229,24 +254,26 @@ export function VisualAttentionGame({
               <Button variant="outline" size="md" onClick={handleReset}>
                 <RotateCcw className="mr-2 h-4 w-4" /> Yeniden Oyna
               </Button>
-              <Button
-                variant="primary"
-                size="md"
-                onClick={() => {
-                  if (onComplete) {
-                    onComplete({
-                      accuracy,
-                      totalFound: clickedIndices.size,
-                      timeSeconds: gameDuration - timeLeft,
-                    });
-                  }
-                  if (typeof window !== "undefined") {
-                    window.location.href = "/panel/ogrenme-yolu";
-                  }
-                }}
-              >
-                Öğrenme Yoluna Devam Et
-              </Button>
+              {selectedLevel < LEVELS.length ? (
+                <Button
+                  variant="primary"
+                  size="md"
+                  onClick={() => {
+                    const nextLevel = LEVELS[selectedLevel];
+                    setSelectedLevel(nextLevel.level);
+                    setGameState("idle");
+                    setClickedIndices(new Set());
+                    setWrongIndices(new Set());
+                    setTimeLeft(nextLevel.seconds);
+                  }}
+                >
+                  Diğer Seviye ile Devam Et
+                </Button>
+              ) : (
+                <p className="self-center text-sm font-semibold text-emerald-700">
+                  Tüm seviyeleri tamamladınız!
+                </p>
+              )}
             </div>
           </div>
         )}
