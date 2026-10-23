@@ -59,7 +59,7 @@ export function MemoryGame({ type, onComplete }: MemoryGameProps) {
   const [mistakes, setMistakes] = useState(0);
   const [locked, setLocked] = useState(false);
   const completionReported = useRef(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+const timeoutRef = useRef<NodeJS.Timeout | number | null>(null);
   const title = isSequence ? "Sembol Sırasını Hatırla" : "Hafıza Kartı Eşleştirme";
   const instruction = isSequence
     ? "Sembollerin aydınlanma sırasını aklınızda tutun, sonra aynı sırayla seçin."
