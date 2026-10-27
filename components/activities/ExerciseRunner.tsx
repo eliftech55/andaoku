@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Activity, ExerciseKind } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +18,7 @@ export interface ExerciseResult {
 interface ExerciseRunnerProps {
   activity: Activity;
   onComplete: (result: ExerciseResult) => Promise<void>;
+  nextActivityHref?: string;
 }
 
 interface FlashRound {
@@ -64,7 +66,7 @@ const FLASH_LIKE_KINDS: ExerciseKind[] = [
   "visual_change",
 ];
 
-export function ExerciseRunner({ activity, onComplete }: ExerciseRunnerProps) {
+export function ExerciseRunner({ activity, onComplete, nextActivityHref }: ExerciseRunnerProps) {
   const kind = activity.type as ExerciseKind;
   const targetSymbol = activity.contentConfig.targetSymbol || (kind === "target_scan" ? "A" : "●");
   const gridSize = Math.min(10, Math.max(3, activity.contentConfig.gridSize || 4));
@@ -308,6 +310,13 @@ export function ExerciseRunner({ activity, onComplete }: ExerciseRunnerProps) {
               </p>
             ) : <p className="text-sm font-semibold text-amber-800">Sonraki seviyeyi açmak için %70’e ulaşın.</p>}
             {saveError && <p role="alert" className="text-sm text-red-800">{saveError}</p>}
+            {!savePending && !saveError && nextActivityHref && (
+              <Link href={nextActivityHref}>
+                <Button variant="primary">
+                  Sonraki egzersize geç
+                </Button>
+              </Link>
+            )}
             <Button variant="outline" onClick={begin} disabled={savePending}><RotateCcw className="mr-2 h-4 w-4" />Yeniden dene</Button>
           </div>
         )}

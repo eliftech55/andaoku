@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { getUserExerciseAttempts, saveExerciseAttempt } from "@/lib/firebase/firestore";
-import { fetchActivityById, fetchAllModules } from "@/lib/services/contentService";
+import { fetchActivities, fetchActivityById, fetchAllModules } from "@/lib/services/contentService";
 import { isExerciseLevelUnlocked } from "@/lib/services/moduleScoring";
 import { Activity, ExerciseAttempt, ExerciseKind, LearningModule } from "@/lib/types";
 import { ArrowLeft, Lock } from "lucide-react";
@@ -26,6 +26,7 @@ export default function RunExercisePage() {
   const { user, profile, loading: authLoading } = useAuth();
   const [activity, setActivity] = useState<Activity | null>(null);
   const [module, setModule] = useState<LearningModule | null>(null);
+  const [nextActivityId, setNextActivityId] = useState<string | null>(null);
   const [attempts, setAttempts] = useState<ExerciseAttempt[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,10 +43,11 @@ export default function RunExercisePage() {
     let active = true;
     async function load() {
       try {
-        const [loadedActivity, modules, attemptList] = await Promise.all([
+        const [loadedActivity, modules, attemptList, allActivities] = await Promise.all([
           fetchActivityById(params.activityId),
           fetchAllModules(),
           getUserExerciseAttempts(userId),
+          fetchActivities(),
         ]);
         if (!active) return;
         if (!loadedActivity || !EXERCISE_KINDS.includes(loadedActivity.type as ExerciseKind) || !loadedActivity.level) {
@@ -64,6 +66,14 @@ export default function RunExercisePage() {
         }
         setActivity(loadedActivity);
         setModule(assignedModule);
+        const assignedActivityIds = assignedModule.activityIds || [];
+        const currentIndex = assignedActivityIds.indexOf(loadedActivity.id);
+        const nextAssignedActivityId =
+          currentIndex >= 0 ? assignedActivityIds[currentIndex + 1] : undefined;
+        const nextActivity = nextAssignedActivityId
+          ? allActivities.find((item) => item.id === nextAssignedActivityId && item.status === "published")
+          : undefined;
+        setNextActivityId(nextActivity?.id || null);
         setAttempts(attemptList);
       } catch (loadError) {
         console.error("Egzersiz açılamadı:", loadError);
@@ -152,7 +162,11 @@ export default function RunExercisePage() {
         <div><Badge variant="amber">{module.title}</Badge><p className="mt-1 text-xs text-charcoal-muted">Bu denemenin puanı öğrenci gelişim raporunuza kaydedilir.</p></div>
         <Link href="/panel/egzersizler"><Button size="sm" variant="outline"><ArrowLeft className="mr-1.5 h-4 w-4" />Egzersizlere dön</Button></Link>
       </div>
-      <ExerciseRunner activity={activity} onComplete={handleComplete} />
+      <ExerciseRunner
+        activity={activity}
+        onComplete={handleComplete}
+        nextActivityHref={nextActivityId ? `/panel/egzersizler/${encodeURIComponent(nextActivityId)}` : undefined}
+      />
       {saved && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">Puanınız ve modül ilerlemeniz Firestore’a kaydedildi.</p>}
     </div>
   );
