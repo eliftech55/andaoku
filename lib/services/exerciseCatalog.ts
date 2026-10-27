@@ -81,7 +81,7 @@ const EXERCISES: Record<
   word_memory: {
     title: "Kelime Listesi Hatırlama",
     description: "Farklı Türkçe kelimeleri kısa süreli bellekte tutma çalışması.",
-    instructions: "Gösterilen kelimeleri hatırlayıp giriş alanına virgülle ayırarak yazın.",
+    instructions: "Gösterilen kelimeleri hatırlayıp her kelimeyi ayrı metin kutusuna, gösterilen sırayla yazın.",
     targetSymbol: "",
   },
   matching_cards: {

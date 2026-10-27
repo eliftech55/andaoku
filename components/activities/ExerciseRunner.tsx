@@ -82,7 +82,7 @@ const FLASH_LIKE_KINDS: ExerciseKind[] = [
 
 const FLASH_WORD_DURATIONS = [6000, 6000, 5000, 5000, 4000];
 const FLASH_WORD_COUNTS = [3, 4, 3, 4, 3];
-const WORD_MEMORY_DURATIONS = [8000, 7500, 7000, 6500, 6000];
+const WORD_MEMORY_DURATIONS = [12000, 11000, 10000, 9000, 8000];
 
 export function ExerciseRunner({ activity, onComplete, nextActivityHref }: ExerciseRunnerProps) {
   const kind = activity.type as ExerciseKind;
@@ -117,8 +117,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   const [flashIndex, setFlashIndex] = useState(0);
   const [flashStage, setFlashStage] = useState<"show" | "choose">("show");
   const [flashCountdown, setFlashCountdown] = useState(0);
-  const [wordMemoryInput, setWordMemoryInput] = useState("");
-  const [wordMemoryError, setWordMemoryError] = useState("");
+  const [wordMemoryInputs, setWordMemoryInputs] = useState<string[]>([]);
   const [correctAnswers, setCorrectAnswers] = useState(0);
   const [summary, setSummary] = useState<ExerciseResult | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -158,8 +157,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     setSaveError(null);
     setSavePending(false);
     setSaccadeError(false);
-    setWordMemoryInput("");
-    setWordMemoryError("");
+    setWordMemoryInputs([]);
     setTimeLeft(durationLimit);
     startedAt.current = Date.now();
 
@@ -213,6 +211,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       setFlashIndex(0);
       setFlashStage("show");
       setFlashCountdown(Math.ceil(wordMemoryDuration / 1000));
+      setWordMemoryInputs(Array(rounds[0]?.words.length ?? 0).fill(""));
     } else if (FLASH_LIKE_KINDS.includes(kind)) {
       const sourceWords = words.length ? words : DISTRACTORS[kind];
       const rounds = Array.from({ length: targetCount }, () => {
@@ -314,10 +313,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     if (phase !== "playing" || kind !== "word_memory" || flashStage !== "choose") return;
 
     const expected = wordMemoryRounds[flashIndex]?.words ?? [];
-    const answer = wordMemoryInput
-      .split(",")
-      .map((word) => word.trim().toLocaleLowerCase("tr-TR"))
-      .filter(Boolean);
+    const answer = wordMemoryInputs.map((word) => word.trim().toLocaleLowerCase("tr-TR"));
     const isCorrect = answer.length === expected.length
       && answer.every((word, index) => word === expected[index].toLocaleLowerCase("tr-TR"));
 
@@ -336,8 +332,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     setFlashIndex(next);
     setFlashStage("show");
     setFlashCountdown(Math.ceil(wordMemoryDuration / 1000));
-    setWordMemoryInput("");
-    setWordMemoryError("");
+    setWordMemoryInputs(Array(expected.length).fill(""));
   };
 
   const title = activity.title;
@@ -453,24 +448,30 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
               </>
             ) : (
               <form className="space-y-3 text-left" onSubmit={handleWordMemorySubmit}>
-                <label htmlFor="word-memory-answer" className="text-sm font-semibold text-charcoal">
-                  Hatırladığınız kelimeleri gösterilen sırayla virgülle yazın:
-                </label>
-                <input
-                  id="word-memory-answer"
-                  type="text"
-                  value={wordMemoryInput}
-                  onChange={(event) => {
-                    setWordMemoryInput(event.target.value);
-                    setWordMemoryError("");
-                  }}
-                  placeholder="ör. kitap, nehir, ışık, kalem"
-                  autoComplete="off"
-                  autoFocus
-                  className="w-full rounded-lg border border-sage-300 bg-white px-3 py-3 text-charcoal outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
-                />
-                {wordMemoryError && <p role="alert" className="text-sm text-rose-700">{wordMemoryError}</p>}
-                <Button type="submit" variant="primary" disabled={!wordMemoryInput.trim()}>
+                <p className="text-sm font-semibold text-charcoal">
+                  Hatırladığınız kelimeleri gösterilen sırayla yazın:
+                </p>
+                <div className="space-y-2">
+                  {wordMemoryRounds[flashIndex].words.map((_, index) => (
+                    <input
+                      key={index}
+                      id={`word-memory-answer-${index}`}
+                      type="text"
+                      value={wordMemoryInputs[index] || ""}
+                      onChange={(event) => {
+                        const nextInputs = [...wordMemoryInputs];
+                        nextInputs[index] = event.target.value;
+                        setWordMemoryInputs(nextInputs);
+                      }}
+                      placeholder={`${index + 1}. kelime`}
+                      autoComplete="off"
+                      autoFocus={index === 0}
+                      aria-label={`${index + 1}. kelime`}
+                      className="w-full rounded-lg border border-sage-300 bg-white px-3 py-3 text-charcoal outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+                    />
+                  ))}
+                </div>
+                <Button type="submit" variant="primary" disabled={wordMemoryInputs.some((word) => !word.trim())}>
                   Cevabı gönder
                 </Button>
               </form>
