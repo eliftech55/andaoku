@@ -89,6 +89,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   const [wrongCells, setWrongCells] = useState<number[]>([]);
   const [sequence, setSequence] = useState<number[]>([]);
   const [sequenceIndex, setSequenceIndex] = useState(0);
+  const [saccadeError, setSaccadeError] = useState(false);
   const [flashRounds, setFlashRounds] = useState<FlashRound[]>([]);
   const [flashIndex, setFlashIndex] = useState(0);
   const [flashStage, setFlashStage] = useState<"show" | "choose">("show");
@@ -130,6 +131,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     setSummary(null);
     setSaveError(null);
     setSavePending(false);
+    setSaccadeError(false);
     setTimeLeft(durationLimit);
     startedAt.current = Date.now();
 
@@ -205,8 +207,10 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     if (phase !== "playing") return;
     if (sequence[index] !== sequence[sequenceIndex]) {
       wrongRef.current += 1;
+      setSaccadeError(true);
       return;
     }
+    setSaccadeError(false);
     const next = sequenceIndex + 1;
     setSequenceIndex(next);
     correctRef.current = next;
@@ -271,11 +275,24 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
 
         {phase === "playing" && kind === "eye_saccade" && (
           <div className="space-y-3">
-            <p className="text-sm text-charcoal-muted">Hedef {sequenceIndex + 1}/{sequence.length} — işaretlenen noktayı sırayla izleyin.</p>
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+              <p className="font-semibold">Nasıl yapılır?</p>
+              <ol className="mt-1 list-inside list-decimal space-y-1">
+                <li>Sarı noktayı gözlerinizle bulun.</li>
+                <li>Bakışınızı sarı noktaya taşıdıktan sonra o noktaya tıklayın.</li>
+                <li>Yeni sarı nokta yanınca aynı işlemi tekrarlayın.</li>
+              </ol>
+              <p className="mt-2 text-xs">Başınızı sabit tutun; yalnızca gözlerinizi hızlı ve kontrollü hareket ettirin.</p>
+            </div>
+            <div className="flex items-center justify-between text-sm text-charcoal-muted">
+              <span>Hedef {sequenceIndex + 1}/{sequence.length}</span>
+              <span>{sequenceIndex} doğru · {wrongRef.current} yanlış</span>
+            </div>
+            {saccadeError && <p role="alert" className="text-sm font-semibold text-rose-700">Bu nokta sıradaki hedef değil. Sarı noktaya tıklayın.</p>}
             <div className="grid max-w-sm grid-cols-3 gap-3 mx-auto rounded-xl bg-ivory-warm p-4">
               {Array.from({ length: 9 }, (_, index) => (
-                <button key={index} type="button" aria-label={`Bakış hedefi ${index + 1}`} onClick={() => handleSaccadeClick(index)} className={`aspect-square rounded-full border-2 text-2xl transition-colors ${sequence[sequenceIndex] === index ? "border-amber-500 bg-amber-200 text-brand-900" : "border-sage-200 bg-white text-transparent"}`}>
-                  ●
+                <button key={index} type="button" aria-label={sequence[sequenceIndex] === index ? "Sıradaki sarı hedef" : `Bakış noktası ${index + 1}`} onClick={() => handleSaccadeClick(index)} className={`aspect-square rounded-full border-2 text-2xl transition-colors ${sequence[sequenceIndex] === index ? "border-amber-500 bg-amber-300 text-brand-900 shadow-md" : sequence.slice(0, sequenceIndex).includes(index) ? "border-emerald-400 bg-emerald-100 text-emerald-700" : "border-sage-200 bg-white text-transparent hover:border-amber-300"}`}>
+                  {sequence[sequenceIndex] === index ? "●" : sequence.slice(0, sequenceIndex).includes(index) ? "✓" : "●"}
                 </button>
               ))}
             </div>

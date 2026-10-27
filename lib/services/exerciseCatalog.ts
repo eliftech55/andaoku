@@ -27,7 +27,7 @@ const EXERCISES: Record<
   eye_saccade: {
     title: "Göz Sıçraması",
     description: "Görüşü farklı noktalara kontrollü biçimde taşıma ve hedef sırasını izleme çalışması.",
-    instructions: "Görünen hedefleri soldan sağa ve yukarıdan aşağıya doğru sırayla seçin.",
+    instructions: "Sarı noktayı gözlerinizle bulun, o noktaya tıklayın ve bir sonraki sarı noktaya geçin. Noktalar rastgele sıradadır; başınızı sabit tutup yalnızca gözlerinizi hızlı ve kontrollü biçimde hareket ettirin.",
     targetSymbol: "●",
   },
   flash_words: {
