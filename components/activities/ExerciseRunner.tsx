@@ -84,6 +84,7 @@ const FLASH_WORD_DURATIONS = [6000, 6000, 5000, 5000, 4000];
 const FLASH_WORD_COUNTS = [3, 4, 3, 4, 3];
 const WORD_MEMORY_DURATIONS = [10000, 10000, 9000, 8500, 8000];
 const WORD_MEMORY_COUNTS = [4, 5, 6, 7, 8];
+const EXERCISE_ROUND_COUNT = 5;
 
 export function ExerciseRunner({ activity, onComplete, nextActivityHref }: ExerciseRunnerProps) {
   const kind = activity.type as ExerciseKind;
@@ -189,7 +190,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       const sourceWords = Array.from(new Set(words.length ? words : DISTRACTORS.flash_words));
       const levelIndex = Math.min(5, Math.max(1, activity.level || 1)) - 1;
       const wordCount = FLASH_WORD_COUNTS[levelIndex];
-      const rounds = Array.from({ length: targetCount }, () => {
+      const rounds = Array.from({ length: EXERCISE_ROUND_COUNT }, () => {
         const roundWords = shuffled(sourceWords).slice(0, wordCount);
         const usedWords = new Set(roundWords);
         const oddOneOut = shuffled(sourceWords.filter((word) => !usedWords.has(word)))[0] || "çalışma";
@@ -208,7 +209,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       const sourceWords = words.length ? words : DISTRACTORS.word_memory;
       const levelIndex = Math.min(5, Math.max(1, activity.level || 1)) - 1;
       const wordCount = WORD_MEMORY_COUNTS[levelIndex];
-      const rounds = Array.from({ length: targetCount }, () => ({
+      const rounds = Array.from({ length: EXERCISE_ROUND_COUNT }, () => ({
         words: shuffled(sourceWords).slice(0, wordCount),
       }));
       setWordMemoryRounds(rounds);
@@ -220,7 +221,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       setWordMemoryInputs(Array(rounds[0]?.words.length ?? 0).fill(""));
     } else if (FLASH_LIKE_KINDS.includes(kind)) {
       const sourceWords = words.length ? words : DISTRACTORS[kind];
-      const rounds = Array.from({ length: targetCount }, () => {
+      const rounds = Array.from({ length: EXERCISE_ROUND_COUNT }, () => {
         const word = sourceWords[Math.floor(Math.random() * sourceWords.length)];
         const options = shuffled([word, ...shuffled(sourceWords.filter((item) => item !== word)).slice(0, 3)]);
         return { word, choices: options };
@@ -355,13 +356,24 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     ? "Sarı noktayı gözlerinizle bulun, o noktaya tıklayın ve bir sonraki sarı noktaya geçin. Noktalar rastgele sıradadır; başınızı sabit tutup yalnızca gözlerinizi hızlı ve kontrollü biçimde hareket ettirin."
     : activity.instructions;
   const progressCount = kind === "eye_saccade" ? sequenceIndex : FLASH_LIKE_KINDS.includes(kind) ? correctAnswers : selectedCells.length;
+  const roundNumber = kind === "eye_saccade"
+    ? Math.min(sequenceIndex + 1, sequenceLength)
+    : FLASH_LIKE_KINDS.includes(kind)
+      ? Math.min(flashIndex + 1, EXERCISE_ROUND_COUNT)
+      : Math.min(selectedCells.length + 1, EXERCISE_ROUND_COUNT);
+  const totalRounds = EXERCISE_ROUND_COUNT;
 
   return (
     <Card className="mx-auto max-w-2xl border-sage-200">
       <CardHeader>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Badge variant="amber">{activity.level ? `Seviye ${activity.level} / 5` : "Egzersiz"}</Badge>
-          {phase === "playing" && <span className="flex items-center gap-1 text-sm font-mono"><Clock className="h-4 w-4" />{timeLeft} sn</span>}
+        {phase === "playing" && (
+          <div className="flex items-center gap-3 text-sm font-mono">
+            <span>Tur {roundNumber}/{totalRounds}</span>
+            <span className="flex items-center gap-1"><Clock className="h-4 w-4" />{timeLeft} sn</span>
+          </div>
+        )}
         </div>
         <CardTitle className="font-serif">{title}</CardTitle>
         <p className="text-sm text-charcoal-muted">{instructions}</p>
@@ -418,7 +430,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
 
         {phase === "playing" && kind === "flash_words" && flashWordRounds[flashIndex] && (
           <div className="space-y-4 rounded-xl bg-ivory-warm p-6 text-center">
-            <p className="text-xs text-charcoal-muted">Tur {flashIndex + 1}/{flashWordRounds.length} · {flashWordRounds[flashIndex].words.length} kelime</p>
+            <p className="text-xs text-charcoal-muted">{flashWordRounds[flashIndex].words.length} kelime</p>
             {flashStage === "show" ? (
               <>
                 <div className="flex items-center justify-between gap-3">
@@ -446,7 +458,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
 
         {phase === "playing" && kind === "word_memory" && wordMemoryRounds[flashIndex] && (
           <div className="space-y-4 rounded-xl bg-ivory-warm p-6 text-center">
-            <p className="text-xs text-charcoal-muted">Tur {flashIndex + 1}/{wordMemoryRounds.length} · {wordMemoryRounds[flashIndex].words.length} kelime</p>
+            <p className="text-xs text-charcoal-muted">{wordMemoryRounds[flashIndex].words.length} kelime</p>
             {flashStage === "show" ? (
               <>
                 <div className="flex items-center justify-between gap-3">
@@ -499,7 +511,6 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
 
         {phase === "playing" && kind !== "flash_words" && kind !== "word_memory" && FLASH_LIKE_KINDS.includes(kind) && flashRounds[flashIndex] && (
           <div className="space-y-4 rounded-xl bg-ivory-warm p-6 text-center">
-            <p className="text-xs text-charcoal-muted">Kelime {flashIndex + 1}/{flashRounds.length}</p>
             {flashStage === "show" ? (
               <div aria-live="polite" className="flex min-h-36 items-center justify-center text-3xl font-extrabold text-brand-900">{flashRounds[flashIndex].word}</div>
             ) : (
