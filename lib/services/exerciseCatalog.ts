@@ -32,8 +32,8 @@ const EXERCISES: Record<
   },
   flash_words: {
     title: "Flaş Kelime Tanıma",
-    description: "Kısa süre gösterilen kelimeyi hızlı algılama ve doğru seçeneği bulma çalışması.",
-    instructions: "Kısa süre gösterilen kelimeyi aklınızda tutup seçenekler arasından seçin.",
+    description: "Kısa süre gösterilen kelime grubunu akılda tutup listede olmayan kelimeyi bulma çalışması.",
+    instructions: "Gösterilen kelimeleri aklınızda tutun. Liste gizlendiğinde, az önceki kelimelerden biri olmayan kelimeyi seçin. Seviyeler ilerledikçe kelime sayısı artar.",
     targetSymbol: "",
   },
   point_tracking: {

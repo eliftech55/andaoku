@@ -26,11 +26,21 @@ interface FlashRound {
   choices: string[];
 }
 
+interface FlashWordRound {
+  words: string[];
+  choices: string[];
+  oddOneOut: string;
+}
+
 const DISTRACTORS: Record<ExerciseKind, string[]> = {
   peripheral_vision: ["▲", "■", "◆", "✦", "●", "○"],
   target_scan: ["R", "H", "K", "4", "Λ", "A"],
   eye_saccade: ["●"],
-  flash_words: ["okuma", "dikkat", "bilgi", "anlam", "kitap", "öğrenme", "tarama", "odak"],
+  flash_words: [
+    "okuma", "dikkat", "bilgi", "anlam", "kitap", "öğrenme", "tarama", "odak",
+    "merak", "çözüm", "kaynak", "fikir", "yöntem", "hafıza", "cümle", "metin",
+    "başarı", "alışkanlık", "keşif", "düşünce",
+  ],
   point_tracking: ["●"],
   infinity_tracking: ["●"],
   chunk_reading: ["hızlı okuma", "bilgi", "dikkatli düşünme", "anlam kurma", "göz hareketi"],
@@ -91,6 +101,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   const [sequenceIndex, setSequenceIndex] = useState(0);
   const [saccadeError, setSaccadeError] = useState(false);
   const [flashRounds, setFlashRounds] = useState<FlashRound[]>([]);
+  const [flashWordRounds, setFlashWordRounds] = useState<FlashWordRound[]>([]);
   const [flashIndex, setFlashIndex] = useState(0);
   const [flashStage, setFlashStage] = useState<"show" | "choose">("show");
   const [correctAnswers, setCorrectAnswers] = useState(0);
@@ -155,6 +166,23 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     } else if (kind === "eye_saccade") {
       setSequence(Array.from({ length: sequenceLength }, () => Math.floor(Math.random() * 9)));
       setSequenceIndex(0);
+    } else if (kind === "flash_words") {
+      const sourceWords = Array.from(new Set(words.length ? words : DISTRACTORS.flash_words));
+      const wordCount = Math.max(5, sequenceLength);
+      const rounds = Array.from({ length: targetCount }, () => {
+        const roundWords = shuffled(sourceWords).slice(0, wordCount);
+        const usedWords = new Set(roundWords);
+        const oddOneOut = shuffled(sourceWords.filter((word) => !usedWords.has(word)))[0] || "çalışma";
+        return {
+          words: roundWords,
+          choices: shuffled([...roundWords, oddOneOut]),
+          oddOneOut,
+        };
+      });
+      setFlashWordRounds(rounds);
+      setFlashRounds([]);
+      setFlashIndex(0);
+      setFlashStage("show");
     } else if (FLASH_LIKE_KINDS.includes(kind)) {
       const sourceWords = words.length ? words : DISTRACTORS[kind];
       const rounds = Array.from({ length: targetCount }, () => {
@@ -220,7 +248,9 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
 
   const handleFlashChoice = (choice: string) => {
     if (phase !== "playing" || flashStage !== "choose") return;
-    const isCorrect = choice === flashRounds[flashIndex]?.word;
+    const isCorrect = kind === "flash_words"
+      ? choice === flashWordRounds[flashIndex]?.oddOneOut
+      : choice === flashRounds[flashIndex]?.word;
     if (isCorrect) {
       correctRef.current += 1;
       setCorrectAnswers(correctRef.current);
@@ -228,8 +258,9 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       wrongRef.current += 1;
     }
     const next = flashIndex + 1;
-    if (next >= flashRounds.length) {
-      finish(correctRef.current, wrongRef.current, flashRounds.length);
+    const roundCount = kind === "flash_words" ? flashWordRounds.length : flashRounds.length;
+    if (next >= roundCount) {
+      finish(correctRef.current, wrongRef.current, roundCount);
       return;
     }
     setFlashIndex(next);
@@ -299,7 +330,30 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
           </div>
         )}
 
-        {phase === "playing" && FLASH_LIKE_KINDS.includes(kind) && flashRounds[flashIndex] && (
+        {phase === "playing" && kind === "flash_words" && flashWordRounds[flashIndex] && (
+          <div className="space-y-4 rounded-xl bg-ivory-warm p-6 text-center">
+            <p className="text-xs text-charcoal-muted">Tur {flashIndex + 1}/{flashWordRounds.length} · {flashWordRounds[flashIndex].words.length} kelime</p>
+            {flashStage === "show" ? (
+              <>
+                <p className="text-sm font-semibold text-charcoal">Bu kelimeleri aklınızda tutun:</p>
+                <div aria-live="polite" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {flashWordRounds[flashIndex].words.map((word) => (
+                    <div key={word} className="rounded-lg border border-amber-200 bg-white px-3 py-3 text-lg font-bold text-brand-900">{word}</div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-semibold text-charcoal">Az önceki listede hangisi yoktu?</p>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {flashWordRounds[flashIndex].choices.map((choice) => <Button key={choice} variant="outline" onClick={() => handleFlashChoice(choice)}>{choice}</Button>)}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {phase === "playing" && kind !== "flash_words" && FLASH_LIKE_KINDS.includes(kind) && flashRounds[flashIndex] && (
           <div className="space-y-4 rounded-xl bg-ivory-warm p-6 text-center">
             <p className="text-xs text-charcoal-muted">Kelime {flashIndex + 1}/{flashRounds.length}</p>
             {flashStage === "show" ? (
