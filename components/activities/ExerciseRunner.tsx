@@ -49,6 +49,11 @@ interface MatchingCard {
   matched: boolean;
 }
 
+interface SequenceMemoryRound {
+  sequence: number[];
+  choices: number[];
+}
+
 const DISTRACTORS: Record<ExerciseKind, string[]> = {
   peripheral_vision: ["▲", "■", "◆", "✦", "●", "○"],
   target_scan: ["R", "H", "K", "4", "Λ", "A"],
@@ -140,6 +145,10 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   const [matchingBusy, setMatchingBusy] = useState(false);
   const [matchingMoves, setMatchingMoves] = useState(0);
   const [matchingPairs, setMatchingPairs] = useState(0);
+  const [sequenceMemoryRound, setSequenceMemoryRound] = useState<SequenceMemoryRound | null>(null);
+  const [sequenceMemoryInput, setSequenceMemoryInput] = useState<number[]>([]);
+  const [sequenceMemoryStage, setSequenceMemoryStage] = useState<"show" | "choose">("show");
+  const [sequenceMemoryVisibleCount, setSequenceMemoryVisibleCount] = useState(0);
   const [flashIndex, setFlashIndex] = useState(0);
   const [flashStage, setFlashStage] = useState<"show" | "choose">("show");
   const [flashCountdown, setFlashCountdown] = useState(0);
@@ -201,6 +210,10 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     setMatchingPairs(0);
     matchingMatchesRef.current = 0;
     matchingMovesRef.current = 0;
+    setSequenceMemoryRound(null);
+    setSequenceMemoryInput([]);
+    setSequenceMemoryStage("show");
+    setSequenceMemoryVisibleCount(0);
     setTimeLeft(durationLimit);
     startedAt.current = Date.now();
 
@@ -291,6 +304,18 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       setMatchingFirst(null);
       setMatchingMoves(0);
       setMatchingPairs(0);
+    } else if (kind === "sequence_memory") {
+      const levelIndex = Math.min(5, Math.max(1, activity.level || 1)) - 1;
+      const sequenceLength = Math.min(8, 3 + levelIndex);
+      const sequence = shuffled(Array.from({ length: 9 }, (_, index) => index)).slice(0, sequenceLength);
+      setSequenceMemoryRound({
+        sequence,
+        choices: Array.from({ length: 9 }, (_, index) => index),
+      });
+      setSequenceMemoryInput([]);
+      setSequenceMemoryStage("show");
+      setSequenceMemoryVisibleCount(0);
+      setFlashIndex(0);
     } else if (FLASH_LIKE_KINDS.includes(kind)) {
       const sourceWords = words.length ? words : DISTRACTORS[kind];
       const rounds = Array.from({ length: EXERCISE_ROUND_COUNT }, () => {
@@ -307,7 +332,11 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   };
 
   useEffect(() => {
-    if (phase !== "playing" || !["flash_words", "word_memory", "memory_palace"].includes(kind) || flashStage !== "show") return;
+    if (
+      phase !== "playing" ||
+      !["flash_words", "word_memory", "memory_palace"].includes(kind) ||
+      flashStage !== "show"
+    ) return;
     const displayDuration = kind === "word_memory" ? wordMemoryDuration : kind === "memory_palace" ? 5000 : flashDuration;
     setFlashCountdown(Math.ceil(displayDuration / 1000));
     const timer = window.setInterval(() => {
@@ -321,7 +350,25 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       });
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [flashDuration, flashIndex, flashStage, kind, phase, wordMemoryDuration]);
+  }, [flashDuration, flashIndex, flashStage, kind, phase, sequenceMemoryStage, wordMemoryDuration]);
+
+  useEffect(() => {
+    if (phase !== "playing" || kind !== "sequence_memory" || !sequenceMemoryRound || sequenceMemoryStage !== "show") {
+      return;
+    }
+    setSequenceMemoryVisibleCount(0);
+    const timer = window.setInterval(() => {
+      setSequenceMemoryVisibleCount((current) => {
+        if (current + 1 >= sequenceMemoryRound.sequence.length) {
+          window.clearInterval(timer);
+          window.setTimeout(() => setSequenceMemoryStage("choose"), 500);
+          return sequenceMemoryRound.sequence.length;
+        }
+        return current + 1;
+      });
+    }, 700);
+    return () => window.clearInterval(timer);
+  }, [kind, phase, sequenceMemoryRound, sequenceMemoryStage]);
 
   useEffect(() => {
     if (phase !== "playing" || timeLeft <= 0) return;
@@ -482,6 +529,41 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     }, 700);
   };
 
+  const handleSequenceMemoryClick = (index: number) => {
+    if (
+      phase !== "playing" ||
+      kind !== "sequence_memory" ||
+      !sequenceMemoryRound ||
+      sequenceMemoryStage !== "choose"
+    ) return;
+
+    const nextInput = [...sequenceMemoryInput, index];
+    setSequenceMemoryInput(nextInput);
+    const expectedIndex = nextInput.length - 1;
+    if (index !== sequenceMemoryRound.sequence[expectedIndex]) {
+      wrongRef.current += 1;
+      finish(correctRef.current, wrongRef.current, EXERCISE_ROUND_COUNT);
+      return;
+    }
+
+    if (nextInput.length === sequenceMemoryRound.sequence.length) {
+      correctRef.current += 1;
+      setCorrectAnswers(correctRef.current);
+      const nextRound = flashIndex + 1;
+      if (nextRound >= EXERCISE_ROUND_COUNT) {
+        finish(correctRef.current, wrongRef.current, EXERCISE_ROUND_COUNT);
+        return;
+      }
+      const nextLength = Math.min(9, sequenceMemoryRound.sequence.length + 1);
+      const nextSequence = shuffled(Array.from({ length: 9 }, (_, cell) => cell)).slice(0, nextLength);
+      setFlashIndex(nextRound);
+      setSequenceMemoryRound({ sequence: nextSequence, choices: Array.from({ length: 9 }, (_, cell) => cell) });
+      setSequenceMemoryInput([]);
+      setSequenceMemoryStage("show");
+      setSequenceMemoryVisibleCount(0);
+    }
+  };
+
   const handleWordMemorySubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (phase !== "playing" || kind !== "word_memory" || flashStage !== "choose") return;
@@ -527,6 +609,8 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     ? Math.min(sequenceIndex + 1, sequenceLength)
     : kind === "matching_cards"
       ? Math.min(flashIndex + 1, EXERCISE_ROUND_COUNT)
+      : kind === "sequence_memory"
+        ? Math.min(flashIndex + 1, EXERCISE_ROUND_COUNT)
     : FLASH_LIKE_KINDS.includes(kind)
       ? Math.min(flashIndex + 1, EXERCISE_ROUND_COUNT)
       : Math.min(selectedCells.length + 1, EXERCISE_ROUND_COUNT);
@@ -755,6 +839,53 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
                 </button>
               ))}
             </div>
+          </div>
+        )}
+
+        {phase === "playing" && kind === "sequence_memory" && sequenceMemoryRound && (
+          <div className="space-y-4 rounded-xl bg-ivory-warm p-6 text-center">
+            {sequenceMemoryStage === "show" ? (
+              <>
+                <p className="text-sm font-semibold text-charcoal">Yanan kutuları bu sırayla aklınızda tutun.</p>
+                <div className="grid max-w-sm grid-cols-3 gap-3 mx-auto rounded-xl bg-white p-4">
+                  {sequenceMemoryRound.choices.map((cell) => (
+                    <div
+                      key={cell}
+                      className={`aspect-square rounded-lg border-2 ${
+                        sequenceMemoryRound.sequence.slice(0, sequenceMemoryVisibleCount).includes(cell)
+                          ? "border-amber-400 bg-amber-300"
+                          : "border-sage-200 bg-sage-50"
+                      }`}
+                    />
+                  ))}
+                </div>
+                <span className="inline-block rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-sm font-bold tabular-nums text-amber-900">
+                  {flashCountdown} sn
+                </span>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-semibold text-charcoal">
+                  Kutuları yanan sırayla seçin. Seçim: {sequenceMemoryInput.length}/{sequenceMemoryRound.sequence.length}
+                </p>
+                <div className="grid max-w-sm grid-cols-3 gap-3 mx-auto rounded-xl bg-white p-4">
+                  {sequenceMemoryRound.choices.map((cell) => (
+                    <button
+                      key={cell}
+                      type="button"
+                      onClick={() => handleSequenceMemoryClick(cell)}
+                      disabled={sequenceMemoryInput.includes(cell)}
+                      className={`aspect-square rounded-lg border-2 transition-colors ${
+                        sequenceMemoryInput.includes(cell)
+                          ? "border-emerald-400 bg-emerald-100"
+                          : "border-sage-200 bg-sage-50 hover:border-amber-400 hover:bg-amber-100"
+                      }`}
+                      aria-label={`Sıra kutusu ${cell + 1}`}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
 
