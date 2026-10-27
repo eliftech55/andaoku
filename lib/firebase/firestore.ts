@@ -140,6 +140,17 @@ export async function saveLearningModuleWithActivities(
   await batch.commit();
 }
 
+export async function updateLearningModuleStatus(
+  moduleId: string,
+  status: "draft" | "published"
+): Promise<void> {
+  await setDoc(
+    doc(db, "learningModules", moduleId),
+    { status, updatedAt: new Date().toISOString() },
+    { merge: true }
+  );
+}
+
 export async function getExerciseDefinitions(): Promise<ExerciseDefinition[]> {
   const snapshot = await getDocs(collection(db, "exerciseDefinitions"));
   return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as ExerciseDefinition);

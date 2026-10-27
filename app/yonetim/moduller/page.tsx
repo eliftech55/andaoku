@@ -8,7 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { db, isFirebaseConfigured } from "@/lib/firebase/client";
-import { saveLearningModuleWithActivities } from "@/lib/firebase/firestore";
+import {
+  saveLearningModuleWithActivities,
+  updateLearningModuleStatus,
+} from "@/lib/firebase/firestore";
 import { fetchPassages } from "@/lib/services/contentService";
 import { DifficultyLevel, EducationLevel, ExerciseKind, LearningModule, ReadingPassage } from "@/lib/types";
 import { CheckCircle2, Eye, Plus, BookOpen, LoaderCircle } from "lucide-react";
@@ -69,7 +72,8 @@ export default function ModuleManagementPage() {
   const [targetSkills, setTargetSkills] = useState("");
   const [passageId, setPassageId] = useState("");
   const [prerequisites, setPrerequisites] = useState<string[]>([]);
-  const [status, setStatus] = useState<"draft" | "published">("draft");
+  const [status, setStatus] = useState<"draft" | "published">("published");
+  const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (authLoading || profile?.role !== "admin") {
@@ -124,7 +128,7 @@ export default function ModuleManagementPage() {
     setTargetSkills("");
     setPassageId(randomItem(passages.filter((passage) => passage.difficulty === "beginner"))?.id || "");
     setPrerequisites([]);
-    setStatus("draft");
+    setStatus("published");
   };
 
   const handleSave = async (event: FormEvent<HTMLFormElement>) => {
@@ -183,6 +187,29 @@ export default function ModuleManagementPage() {
       setError("Modül kaydedilemedi. Firestore yazma yetkisini ve bağlantıyı kontrol edin.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleStatusChange = async (module: LearningModule) => {
+    const nextStatus = module.status === "published" ? "draft" : "published";
+    setStatusUpdatingId(module.id);
+    setError(null);
+    setSuccess(null);
+    try {
+      await updateLearningModuleStatus(module.id, nextStatus);
+      setModules((current) =>
+        current.map((item) => item.id === module.id ? { ...item, status: nextStatus } : item)
+      );
+      setSuccess(
+        nextStatus === "published"
+          ? `"${module.title}" kullanıcıların erişimine açıldı.`
+          : `"${module.title}" taslağa alındı.`
+      );
+    } catch (statusError) {
+      console.error("Modül yayın durumu güncellenemedi:", statusError);
+      setError("Modülün yayın durumu güncellenemedi. Firestore yazma yetkisini kontrol edin.");
+    } finally {
+      setStatusUpdatingId(null);
     }
   };
 
@@ -368,6 +395,20 @@ export default function ModuleManagementPage() {
                   {module.educationLevel ? ` · ${EDUCATION_LEVELS.find((level) => level.value === module.educationLevel)?.label}` : ""}
                   {` · ${module.estimatedDuration} dk · Sıra ${module.order}`}
                 </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={module.status === "published" ? "outline" : "amber"}
+                  className="mt-3"
+                  onClick={() => void handleStatusChange(module)}
+                  disabled={statusUpdatingId === module.id}
+                >
+                  {statusUpdatingId === module.id
+                    ? "Güncelleniyor..."
+                    : module.status === "published"
+                    ? "Taslağa al"
+                    : "Yayınla"}
+                </Button>
                 <p className="mt-2 text-xs text-charcoal-muted">
                   Okuma metni: {passages.find((passage) => passage.id === module.readingPassageId)?.title || "Henüz atanmamış"}
                 </p>
