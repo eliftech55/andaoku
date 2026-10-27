@@ -112,7 +112,7 @@ export default function UserDashboardPage() {
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-amber-400 uppercase tracking-wider">Öğrenci Portalı</span>
             <span className="text-xs text-sage-300">•</span>
-            <span className="text-xs text-sage-300 capitalize">{profile?.educationLevel || "Ortaokul"} Kademesi</span>
+            <span className="text-xs text-sage-300">Kolay · Orta · Zor Modüller</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold font-serif">
             Hoş geldin, {firstName}!

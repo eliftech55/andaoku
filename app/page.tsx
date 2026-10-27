@@ -62,8 +62,8 @@ export default function HomePage() {
       icon: Target,
     },
     {
-      title: "10 Aşamalı Öğrenme Yolu",
-      desc: "Ön koşulları tamamlayarak seviye seviye açılan, pedagojik araştırma temelli yapılandırılmış müfredat.",
+      title: "Kolaydan Zora Öğrenme Yolu",
+      desc: "Kolay, orta ve zor modüller; ön koşulları tamamladıkça açılan, pedagojik araştırma temelli yapılandırılmış bir müfredat sunar.",
       icon: Compass,
     },
     {
@@ -77,8 +77,8 @@ export default function HomePage() {
       icon: GraduationCap,
     },
     {
-      title: "Yaş ve Kademeye Uygun İçerik",
-      desc: "İlkokul, ortaokul, lise, üniversite ve yetişkin okurlara göre sınıflandırılmış zengin metin kütüphanesi.",
+      title: "Kolay, Orta ve Zor İçerikler",
+      desc: "Metinler; okuma becerilerini adım adım geliştirmek için kolay, orta ve zor seviyelere göre ayrıştırılmış zengin bir kütüphane sunar.",
       icon: Users,
     },
     {
@@ -95,7 +95,7 @@ export default function HomePage() {
     },
     {
       q: "Her yaştan kullanıcı AndaOku'dan faydalanabilir mi?",
-      a: "Evet. Platformumuz ilkokul (3-4. sınıf), ortaokul, lise, üniversite hazırlık ve yetişkin profesyoneller için ayrı metin zorlukları ve yaş grubuna özel etkinlikler sunar.",
+      a: "Evet. Platformumuz, her kullanıcıya kolay, orta ve zor seviyelerde ayrıştırılmış metinler ve etkinlikler sunar. İlerleyiş, eğitim kademesinden bağımsız olarak tamamlanan çalışmalar ve alınan puanlarla belirlenir.",
     },
     {
       q: "Öğretmenler sınıflarını nasıl sisteme dâhil edebilir?",
@@ -146,7 +146,7 @@ export default function HomePage() {
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-              <span>10 Aşamalı Modüler Yol</span>
+              <span>Kolaydan Zora Modüler Yol</span>
             </div>
             <div className="flex items-center gap-2 hidden sm:flex">
               <CheckCircle2 className="h-4 w-4 text-emerald-600" />
@@ -159,7 +159,7 @@ export default function HomePage() {
       {/* 4 AŞAMALI GELİŞİM ALANI */}
       <section className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-2xl mx-auto mb-12">
-          <Badge variant="secondary" className="mb-2">Aşamalı Öğrenme</Badge>
+          <Badge variant="secondary" className="mb-2">Kolaydan Zora Öğrenme</Badge>
           <h2 className="text-3xl sm:text-4xl font-bold font-serif text-charcoal">
             Okuma Gelişiminin 4 Temel Ayağı
           </h2>

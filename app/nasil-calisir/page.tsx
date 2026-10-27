@@ -21,7 +21,7 @@ export default function NasilCalisirPage() {
       num: "01",
       title: "Başlangıç Değerlendirmesi",
       icon: Target,
-      desc: "Platforma katıldığınızda yaş ve eğitim kademenize uygun eşdeğer bir metinle ilk okuma seansınızı yaparsınız. Sistem kelime sayısını, başlangıç-bitiş süresini ve ardından yöneltilen çoktan seçmeli anlama sorularını değerlendirerek ham WPM ve anlama yüzdenizi tespit eder.",
+      desc: "Platforma katıldığınızda başlangıç seviyenize uygun bir metinle ilk okuma seansınızı yaparsınız. Sistem kelime sayısını, başlangıç-bitiş süresini ve ardından yöneltilen çoktan seçmeli anlama sorularını değerlendirerek ham WPM ve anlama yüzdenizi tespit eder.",
       notes: "Hız ve anlama bağımsız olarak ölçülür. Başlangıç puanı, sonraki tüm gelişiminizin referans noktasıdır.",
     },
     {

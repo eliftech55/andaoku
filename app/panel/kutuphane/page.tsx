@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { fetchPassages } from "@/lib/services/contentService";
-import { ReadingPassage, EducationLevel, DifficultyLevel } from "@/lib/types";
+import { ReadingPassage, DifficultyLevel } from "@/lib/types";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,6 @@ import { countTurkishWords } from "@/lib/utils";
 export default function KutuphanePage() {
   const [passages, setPassages] = useState<ReadingPassage[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedLevel, setSelectedLevel] = useState<string>("all");
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>("all");
   const [selectedGenre, setSelectedGenre] = useState<string>("all");
   const [sortBy, setSortBy] = useState<"title" | "wordCount" | "estimatedReadingTime">("wordCount");
@@ -44,17 +43,13 @@ export default function KutuphanePage() {
         p.topic.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.content.toLowerCase().includes(searchQuery.toLowerCase());
 
-      // Eğitim kademesi
-      const matchesLevel =
-        selectedLevel === "all" || p.educationLevels.includes(selectedLevel as EducationLevel);
-
       // Zorluk
       const matchesDifficulty = selectedDifficulty === "all" || p.difficulty === selectedDifficulty;
 
       // Tür
       const matchesGenre = selectedGenre === "all" || p.genre === selectedGenre;
 
-      return matchesSearch && matchesLevel && matchesDifficulty && matchesGenre;
+      return matchesSearch && matchesDifficulty && matchesGenre;
     })
     .sort((a, b) => {
       let valA: any = a[sortBy];
@@ -95,23 +90,7 @@ export default function KutuphanePage() {
         </div>
 
         {/* Filtre Açılır Menüleri */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-          <div>
-            <label className="font-semibold text-charcoal block mb-1">Eğitim Kademesi</label>
-            <select
-              value={selectedLevel}
-              onChange={(e) => setSelectedLevel(e.target.value)}
-              className="w-full p-2 rounded-xl border border-sage-200 bg-white"
-            >
-              <option value="all">Tüm Kademeler</option>
-              <option value="primary">İlkokul</option>
-              <option value="middle">Ortaokul</option>
-              <option value="high">Lise</option>
-              <option value="university">Üniversite</option>
-              <option value="adult">Yetişkin</option>
-            </select>
-          </div>
-
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
           <div>
             <label className="font-semibold text-charcoal block mb-1">Zorluk Seviyesi</label>
             <select
@@ -120,9 +99,9 @@ export default function KutuphanePage() {
               className="w-full p-2 rounded-xl border border-sage-200 bg-white"
             >
               <option value="all">Tüm Zorluklar</option>
-              <option value="beginner">Başlangıç</option>
-              <option value="intermediate">Orta Düzey</option>
-              <option value="advanced">İleri Düzey</option>
+              <option value="beginner">Kolay</option>
+              <option value="intermediate">Orta</option>
+              <option value="advanced">Zor</option>
             </select>
           </div>
 
@@ -178,7 +157,6 @@ export default function KutuphanePage() {
             variant="outline"
             onClick={() => {
               setSearchQuery("");
-              setSelectedLevel("all");
               setSelectedDifficulty("all");
               setSelectedGenre("all");
             }}
@@ -212,10 +190,10 @@ export default function KutuphanePage() {
                       className="capitalize text-[10px]"
                     >
                       {passage.difficulty === "beginner"
-                        ? "Başlangıç"
+                        ? "Kolay"
                         : passage.difficulty === "intermediate"
                         ? "Orta"
-                        : "İleri"}
+                        : "Zor"}
                     </Badge>
                   </div>
 

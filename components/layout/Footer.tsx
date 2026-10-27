@@ -62,9 +62,9 @@ export function Footer() {
           <div className="space-y-3">
             <h4 className="text-sm font-bold text-brand-900 uppercase tracking-wider">Hedef Gruplar</h4>
             <ul className="space-y-2 text-sm text-charcoal-muted">
-              <li>İlkokul ve Ortaokul Düzeyi</li>
-              <li>Lise ve Üniversite Hazırlık</li>
-              <li>Yetişkin & Profesyonel Okurlar</li>
+              <li>Kolay Seviye İçerikler</li>
+              <li>Orta Seviye İçerikler</li>
+              <li>Zor Seviye İçerikler</li>
               <li>
                 <Link href="/ogretmen" className="hover:text-brand-700 transition-colors font-medium">
                   Öğretmen ve Sınıf Takibi
