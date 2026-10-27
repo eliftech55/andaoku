@@ -76,7 +76,8 @@ const FLASH_LIKE_KINDS: ExerciseKind[] = [
   "visual_change",
 ];
 
-const FLASH_WORD_DURATIONS = [6000, 5500, 5000, 4500, 4000];
+const FLASH_WORD_DURATIONS = [6000, 6000, 5000, 5000, 4000];
+const FLASH_WORD_COUNTS = [3, 4, 3, 4, 3];
 
 export function ExerciseRunner({ activity, onComplete, nextActivityHref }: ExerciseRunnerProps) {
   const kind = activity.type as ExerciseKind;
@@ -172,7 +173,8 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       setSequenceIndex(0);
     } else if (kind === "flash_words") {
       const sourceWords = Array.from(new Set(words.length ? words : DISTRACTORS.flash_words));
-      const wordCount = Math.max(4, sequenceLength - 1);
+      const levelIndex = Math.min(5, Math.max(1, activity.level || 1)) - 1;
+      const wordCount = FLASH_WORD_COUNTS[levelIndex];
       const rounds = Array.from({ length: targetCount }, () => {
         const roundWords = shuffled(sourceWords).slice(0, wordCount);
         const usedWords = new Set(roundWords);
