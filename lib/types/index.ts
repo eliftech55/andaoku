@@ -293,7 +293,6 @@ export interface UserAssignment {
   id: string;
   userId: string;
   title: string;
-  description?: string;
   activityId?: string;
   assignedBy: string;
   assignedAt: string;

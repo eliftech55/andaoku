@@ -33,6 +33,7 @@ import {
   ExerciseDefinition,
   ExerciseKind,
   UserProfile,
+  UserRole,
 } from "../types";
 import { BUILT_IN_EXERCISE_DEFINITIONS } from "../services/exerciseCatalog";
 import { calculateModuleScore } from "../services/moduleScoring";
@@ -635,6 +636,18 @@ export async function updateUserStatus(
   }
 }
 
+export async function updateUserRole(userId: string, role: UserRole): Promise<void> {
+  try {
+    await updateDoc(doc(db, "users", userId), {
+      role,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Kullanıcı rolü güncellenemedi:", error);
+    throw error;
+  }
+}
+
 export async function createUserAssignment(
   assignment: Omit<UserAssignment, "id">
 ): Promise<string> {
@@ -643,6 +656,30 @@ export async function createUserAssignment(
     return docRef.id;
   } catch (error) {
     console.error("Kullanıcı görevi oluşturulamadı:", error);
+    throw error;
+  }
+}
+
+export async function getUserAssignments(userId: string): Promise<UserAssignment[]> {
+  try {
+    const snapshot = await getDocs(
+      query(collection(db, "userAssignments"), where("userId", "==", userId))
+    );
+    return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as UserAssignment);
+  } catch (error) {
+    console.error("Kullanıcı görevleri getirilemedi:", error);
+    throw error;
+  }
+}
+
+export async function updateUserAssignment(
+  assignmentId: string,
+  changes: Pick<UserAssignment, "title" | "dueAt" | "status">
+): Promise<void> {
+  try {
+    await updateDoc(doc(db, "userAssignments", assignmentId), changes);
+  } catch (error) {
+    console.error("Kullanıcı görevi güncellenemedi:", error);
     throw error;
   }
 }
