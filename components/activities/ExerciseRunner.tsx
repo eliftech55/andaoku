@@ -15,6 +15,11 @@ export interface ExerciseResult {
   durationSeconds: number;
 }
 
+interface ChunkRound {
+  group: string[];
+  choices: string[][];
+}
+
 interface ExerciseRunnerProps {
   activity: Activity;
   onComplete: (result: ExerciseResult) => Promise<void>;
@@ -121,6 +126,8 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   const sequenceLength = Math.min(20, Math.max(3, activity.contentConfig.sequenceLength || 4));
   const flashDuration = kind === "flash_words"
     ? FLASH_WORD_DURATIONS[Math.min(5, Math.max(1, activity.level || 1)) - 1]
+    : kind === "chunk_reading"
+      ? 2500
     : Math.min(3000, Math.max(200, activity.contentConfig.flashDurationMs || 1000));
   const wordMemoryDuration = WORD_MEMORY_DURATIONS[Math.min(5, Math.max(1, activity.level || 1)) - 1];
   const words = activity.contentConfig.wordList?.length
@@ -138,6 +145,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   const [saccadeError, setSaccadeError] = useState(false);
   const [flashRounds, setFlashRounds] = useState<FlashRound[]>([]);
   const [flashWordRounds, setFlashWordRounds] = useState<FlashWordRound[]>([]);
+  const [chunkRounds, setChunkRounds] = useState<ChunkRound[]>([]);
   const [wordMemoryRounds, setWordMemoryRounds] = useState<WordMemoryRound[]>([]);
   const [memoryPalaceRounds, setMemoryPalaceRounds] = useState<MemoryPalaceRound[]>([]);
   const [matchingCards, setMatchingCards] = useState<MatchingCard[]>([]);
@@ -208,6 +216,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     setSaccadeError(false);
     setWordMemoryInputs([]);
     setFlashIndex(0);
+    setChunkRounds([]);
     setMatchingCards([]);
     setMatchingFirst(null);
     setMatchingBusy(false);
@@ -322,6 +331,27 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       setFlashIndex(0);
     } else if (kind === "point_tracking") {
       setFlashIndex(0);
+    } else if (kind === "chunk_reading") {
+      const sourceWords = words.length ? words : DISTRACTORS.chunk_reading;
+      const levelIndex = Math.min(5, Math.max(1, activity.level || 1)) - 1;
+      const groupSize = levelIndex >= 2 ? 3 : 2;
+      const rounds = Array.from({ length: EXERCISE_ROUND_COUNT }, () => {
+        const group = shuffled(sourceWords).slice(0, groupSize);
+        const distractorGroups = Array.from({ length: 3 }, () =>
+          shuffled(sourceWords).slice(0, groupSize)
+        );
+        return {
+          group,
+          choices: shuffled([group, ...distractorGroups].map((choice) => choice.join(" • "))),
+        };
+      });
+      setChunkRounds(rounds.map((round) => ({
+        group: round.group,
+        choices: round.choices.map((choice) => choice.split(" • ")),
+      })));
+      setFlashIndex(0);
+      setFlashStage("show");
+      setFlashCountdown(Math.ceil(flashDuration / 1000));
     } else if (FLASH_LIKE_KINDS.includes(kind)) {
       const sourceWords = words.length ? words : DISTRACTORS[kind];
       const rounds = Array.from({ length: EXERCISE_ROUND_COUNT }, () => {
@@ -338,11 +368,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   };
 
   useEffect(() => {
-    if (
-      phase !== "playing" ||
-      !["flash_words", "word_memory", "memory_palace"].includes(kind) ||
-      flashStage !== "show"
-    ) return;
+    if (phase !== "playing" || !["flash_words", "word_memory", "memory_palace", "chunk_reading"].includes(kind) || flashStage !== "show") return;
     const displayDuration = kind === "word_memory" ? wordMemoryDuration : kind === "memory_palace" ? 5000 : flashDuration;
     setFlashCountdown(Math.ceil(displayDuration / 1000));
     const timer = window.setInterval(() => {
@@ -450,6 +476,26 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     }
     setFlashIndex(next);
     setFlashStage("show");
+  };
+
+  const handleChunkChoice = (choice: string[]) => {
+    if (phase !== "playing" || kind !== "chunk_reading" || flashStage !== "choose") return;
+    const round = chunkRounds[flashIndex];
+    const isCorrect = Boolean(round) && choice.join(" • ") === round.group.join(" • ");
+    if (isCorrect) {
+      correctRef.current += 1;
+      setCorrectAnswers(correctRef.current);
+    } else {
+      wrongRef.current += 1;
+    }
+    const next = flashIndex + 1;
+    if (next >= chunkRounds.length) {
+      finish(correctRef.current, wrongRef.current, chunkRounds.length);
+      return;
+    }
+    setFlashIndex(next);
+    setFlashStage("show");
+    setFlashCountdown(Math.ceil(flashDuration / 1000));
   };
 
   const handleMemoryPalaceChoice = (choice: string) => {
@@ -644,6 +690,40 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
               Beş seviyeli ilerleme sisteminde sonraki seviye, bu seviyeden en az %70 puan aldığınızda açılır.
             </p>
             <Button variant="amber" size="lg" onClick={begin}><Play className="mr-2 h-4 w-4" />Egzersizi başlat</Button>
+          </div>
+        )}
+
+        {phase === "playing" && kind === "chunk_reading" && chunkRounds[flashIndex] && (
+          <div className="space-y-4 rounded-xl bg-ivory-warm p-6 text-center">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-semibold text-charcoal">Kelime grubunu okuyup aklınızda tutun.</p>
+              <span className="rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-sm font-bold tabular-nums text-amber-900" aria-live="polite">
+                {flashCountdown} sn
+              </span>
+            </div>
+            {flashStage === "show" ? (
+              <>
+                <div className="flex min-h-36 items-center justify-center rounded-xl border border-amber-200 bg-white px-4 text-2xl font-extrabold text-brand-900">
+                  {chunkRounds[flashIndex].group.join(" • ")}
+                </div>
+                <p className="text-xs text-charcoal-muted">
+                  Kelimeleri tek tek değil, tek bir anlam grubu olarak okuyun.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-semibold text-charcoal">
+                  Az önce gördüğünüz kelime grubu hangisiydi?
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {chunkRounds[flashIndex].choices.map((choice) => (
+                    <Button key={choice.join("-")} variant="outline" onClick={() => handleChunkChoice(choice)}>
+                      {choice.join(" • ")}
+                    </Button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -930,7 +1010,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
           </div>
         )}
 
-        {phase === "playing" && kind !== "matching_cards" && kind !== "flash_words" && kind !== "word_memory" && FLASH_LIKE_KINDS.includes(kind) && flashRounds[flashIndex] && (
+        {phase === "playing" && !["matching_cards", "flash_words", "word_memory", "chunk_reading"].includes(kind) && FLASH_LIKE_KINDS.includes(kind) && flashRounds[flashIndex] && (
           <div className="space-y-4 rounded-xl bg-ivory-warm p-6 text-center">
             {flashStage === "show" ? (
               <div aria-live="polite" className="flex min-h-36 items-center justify-center text-3xl font-extrabold text-brand-900">{flashRounds[flashIndex].word}</div>

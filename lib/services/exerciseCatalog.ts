@@ -51,7 +51,7 @@ const EXERCISES: Record<
   chunk_reading: {
     title: "Kelime Grubu Flaş",
     description: "Kelimeleri tek tek yerine anlamlı gruplar hâlinde algılama çalışması.",
-    instructions: "Kısa süre gösterilen kelime grubunu okuyup ardından anlamını hatırlayın.",
+    instructions: "Kısa süre gösterilen kelime grubunu okuyun. Grup gizlendiğinde, az önce gördüğünüz kelimeleri aynı grup içinde bulup seçin.",
     targetSymbol: "",
   },
   pacer_reading: {
