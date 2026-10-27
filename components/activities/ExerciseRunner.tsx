@@ -162,7 +162,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     setPhase("finished");
     const score = kind === "matching_cards"
       ? matchingMovesRef.current > 0
-        ? Math.round((matchingMatchesRef.current / matchingMovesRef.current) * 200)
+        ? Math.min(100, Math.round((matchingMatchesRef.current / matchingMovesRef.current) * 200))
         : 0
       : total + wrong > 0
         ? Math.round((correct / (total + wrong)) * 100)
