@@ -188,18 +188,23 @@ export default function ModuleManagementPage() {
             Modülleri oluşturun, okuma metinlerini ve beş seviyeli egzersizleri ayrı seçim ekranında atayın.
           </p>
         </div>
-        <Button
-          size="sm"
-          variant="amber"
-          onClick={() => {
-            setError(null);
-            setSuccess(null);
-            setFormOpen((open) => !open);
-          }}
-        >
-          <Plus className="mr-1.5 h-4 w-4" />
-          {formOpen ? "Formu Kapat" : "Yeni Modül Ekle"}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/yonetim">
+            <Button size="sm" variant="outline">Yönetim Paneline Dön</Button>
+          </Link>
+          <Button
+            size="sm"
+            variant="amber"
+            onClick={() => {
+              setError(null);
+              setSuccess(null);
+              setFormOpen((open) => !open);
+            }}
+          >
+            <Plus className="mr-1.5 h-4 w-4" />
+            {formOpen ? "Formu Kapat" : "Yeni Modül Ekle"}
+          </Button>
+        </div>
       </header>
       <div className="flex flex-wrap gap-2">
         <Link href="/yonetim/egzersizler">

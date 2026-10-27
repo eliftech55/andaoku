@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -108,9 +109,14 @@ export default function ExerciseManagementPage() {
           <h1 className="text-3xl font-extrabold font-serif text-charcoal">Egzersiz Yönetimi</h1>
           <p className="text-sm text-charcoal-muted">Dört göz/okuma egzersizi türünü ve kolaydan zora beş seviyesini düzenleyin.</p>
         </div>
-        <Button size="sm" variant="amber" onClick={handleInitialize} disabled={initializing}>
-          {initializing ? <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" />Hazırlanıyor</> : <><Eye className="mr-2 h-4 w-4" />{definitions.length ? "Eksik seviyeleri ekle" : "Egzersiz kataloğunu oluştur"}</>}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/yonetim">
+            <Button size="sm" variant="outline">Yönetim Paneline Dön</Button>
+          </Link>
+          <Button size="sm" variant="amber" onClick={handleInitialize} disabled={initializing}>
+            {initializing ? <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" />Hazırlanıyor</> : <><Eye className="mr-2 h-4 w-4" />{definitions.length ? "Eksik seviyeleri ekle" : "Egzersiz kataloğunu oluştur"}</>}
+          </Button>
+        </div>
       </header>
 
       {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">{error}</p>}
