@@ -15,6 +15,10 @@ const educationLevelLabels = {
   adult: "yetişkin",
 } as const;
 
+function canGenerateContent(role: unknown): boolean {
+  return role === "admin" || role === "content_manager";
+}
+
 function isModelCapacityError(error: unknown): boolean {
   return (
     error instanceof Error &&
@@ -139,10 +143,10 @@ async function verifyAdmin(idToken: string): Promise<boolean> {
   if (adminAuth && adminDb) {
     try {
       const decodedToken = await adminAuth.verifyIdToken(idToken);
-      if (decodedToken.role === "admin") return true;
+      if (canGenerateContent(decodedToken.role)) return true;
 
       const profile = await adminDb.collection("users").doc(decodedToken.uid).get();
-      return profile.data()?.role === "admin";
+      return canGenerateContent(profile.data()?.role);
     } catch (error) {
       console.warn("Firebase Admin doğrulaması başarısız, REST doğrulamasına geçiliyor:", error);
     }
@@ -185,7 +189,7 @@ async function verifyAdmin(idToken: string): Promise<boolean> {
   const profile = (await profileResponse.json()) as {
     fields?: { role?: { stringValue?: string } };
   };
-  return profile.fields?.role?.stringValue === "admin";
+  return canGenerateContent(profile.fields?.role?.stringValue);
 }
 
 export async function POST(request: NextRequest) {
