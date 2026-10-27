@@ -332,23 +332,45 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     } else if (kind === "point_tracking") {
       setFlashIndex(0);
     } else if (kind === "chunk_reading") {
-      const sourceWords = words.length ? words : DISTRACTORS.chunk_reading;
+      const sourceWords = Array.from(new Set([
+        ...(words.length ? words : DISTRACTORS.chunk_reading),
+        ...DISTRACTORS.chunk_reading,
+        "odak",
+        "anlam",
+      ]));
       const levelIndex = Math.min(5, Math.max(1, activity.level || 1)) - 1;
       const groupSize = levelIndex >= 2 ? 3 : 2;
       const rounds = Array.from({ length: EXERCISE_ROUND_COUNT }, () => {
         const group = shuffled(sourceWords).slice(0, groupSize);
-        const distractorGroups = Array.from({ length: 3 }, () =>
-          shuffled(sourceWords).slice(0, groupSize)
-        );
+        const correctKey = group.join(" • ");
+        const distractorGroups: string[][] = [];
+        const usedKeys = new Set([correctKey]);
+        let attempts = 0;
+        while (distractorGroups.length < 3 && attempts < 30) {
+          const candidate = shuffled(sourceWords).slice(0, groupSize);
+          const candidateKey = candidate.join(" • ");
+          attempts += 1;
+          if (candidate.length === groupSize && !usedKeys.has(candidateKey)) {
+            usedKeys.add(candidateKey);
+            distractorGroups.push(candidate);
+          }
+        }
+        while (distractorGroups.length < 3) {
+          const candidate = Array.from({ length: groupSize }, (_, index) =>
+            sourceWords[(index + distractorGroups.length + 1) % sourceWords.length]
+          );
+          const candidateKey = candidate.join(" • ");
+          if (!usedKeys.has(candidateKey)) {
+            usedKeys.add(candidateKey);
+            distractorGroups.push(candidate);
+          }
+        }
         return {
           group,
-          choices: shuffled([group, ...distractorGroups].map((choice) => choice.join(" • "))),
+          choices: shuffled([group, ...distractorGroups]),
         };
       });
-      setChunkRounds(rounds.map((round) => ({
-        group: round.group,
-        choices: round.choices.map((choice) => choice.split(" • ")),
-      })));
+      setChunkRounds(rounds);
       setFlashIndex(0);
       setFlashStage("show");
       setFlashCountdown(Math.ceil(flashDuration / 1000));
