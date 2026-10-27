@@ -158,8 +158,13 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     if (completed.current) return;
     completed.current = true;
     setPhase("finished");
+    const score = kind === "matching_cards"
+      ? Math.max(0, Math.round((correct / total) * 100) - wrong * 5)
+      : total + wrong > 0
+        ? Math.round((correct / (total + wrong)) * 100)
+        : 0;
     const result = {
-      score: total + wrong > 0 ? Math.round((correct / (total + wrong)) * 100) : 0,
+      score,
       correctCount: correct,
       totalCount: total,
       durationSeconds: Math.max(1, Math.round((Date.now() - startedAt.current) / 1000)),
