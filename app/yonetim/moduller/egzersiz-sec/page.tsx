@@ -56,6 +56,16 @@ const KIND_LABELS: Record<ExerciseKind, string> = {
   visual_change: "Neyin Değişti?",
 };
 
+const DIFFICULTY_LABELS: Record<LearningModule["difficulty"], string> = {
+  beginner: "Kolay",
+  intermediate: "Orta",
+  advanced: "Zor",
+};
+
+function shuffled<T>(items: T[]): T[] {
+  return [...items].sort(() => Math.random() - 0.5);
+}
+
 function getInitialExerciseLevels(
   module: LearningModule | undefined
 ): Partial<Record<ExerciseKind, number[]>> {
@@ -67,6 +77,16 @@ function getInitialExerciseLevels(
     },
     {}
   );
+}
+
+function randomItem<T>(items: T[]): T | undefined {
+  return items.length ? items[Math.floor(Math.random() * items.length)] : undefined;
+}
+
+function getLevelsForDifficulty(difficulty: LearningModule["difficulty"]): number[] {
+  if (difficulty === "advanced") return [1, 2, 3, 4, 5];
+  if (difficulty === "intermediate") return [1, 2, 3];
+  return [1, 2];
 }
 
 function SelectModuleExercisesContent() {
@@ -107,10 +127,17 @@ function SelectModuleExercisesContent() {
           moduleList.find((module) => module.id === requestedModuleId)?.id || moduleList[0]?.id || "";
         setSelectedModuleId(initialModuleId);
         const initialModule = moduleList.find((module) => module.id === initialModuleId);
+        const matchingPassages = publishedPassages.filter(
+          (passage) => passage.difficulty === initialModule?.difficulty
+        );
         setSelectedPassageId(
-          publishedPassages.some((passage) => passage.id === initialModule?.readingPassageId)
+          publishedPassages.some(
+            (passage) =>
+              passage.id === initialModule?.readingPassageId &&
+              passage.difficulty === initialModule?.difficulty
+          )
             ? initialModule?.readingPassageId || ""
-            : publishedPassages[0]?.id || ""
+            : randomItem(matchingPassages)?.id || ""
         );
         setSelectedKinds(initialModule?.exerciseTypes || []);
         setSelectedLevels(getInitialExerciseLevels(initialModule));
@@ -132,14 +159,55 @@ function SelectModuleExercisesContent() {
   const handleModuleChange = (moduleId: string) => {
     setSelectedModuleId(moduleId);
     const module = modules.find((item) => item.id === moduleId);
+    const matchingPassages = passages.filter((passage) => passage.difficulty === module?.difficulty);
     setSelectedPassageId(
       passages.some((passage) => passage.id === module?.readingPassageId)
         ? module?.readingPassageId || ""
-        : passages[0]?.id || ""
+        : randomItem(matchingPassages)?.id || ""
     );
     setSelectedKinds(module?.exerciseTypes || []);
     setSelectedLevels(getInitialExerciseLevels(module));
     setSuccess(null);
+  };
+
+  const assignRandomContent = () => {
+    if (!selectedModule) {
+      setError("Önce bir modül seçin.");
+      return;
+    }
+    const matchingPassages = passages.filter(
+      (passage) => passage.difficulty === selectedModule.difficulty
+    );
+    if (!matchingPassages.length) {
+      setError("Bu zorluk seviyesinde yayımlanmış okuma metni bulunamadı.");
+      return;
+    }
+    const availableKinds = KIND_ORDER.filter((kind) =>
+      definitions.some(
+        (definition) =>
+          definition.kind === kind &&
+          definition.status === "published" &&
+          getLevelsForDifficulty(selectedModule.difficulty).includes(definition.level)
+      )
+    );
+    if (availableKinds.length < 4) {
+      setError("Bu zorluk seviyesi için en az dört egzersiz türünün kataloğa eklenmesi gerekir.");
+      return;
+    }
+    const selectedRandomKinds = shuffled(availableKinds).slice(0, 4);
+    const levels = getLevelsForDifficulty(selectedModule.difficulty);
+    setSelectedPassageId(randomItem(matchingPassages)?.id || "");
+    setSelectedKinds(selectedRandomKinds);
+    setSelectedLevels(
+      selectedRandomKinds.reduce<Partial<Record<ExerciseKind, number[]>>>((result, kind) => {
+        result[kind] = levels;
+        return result;
+      }, {})
+    );
+    setError(null);
+    setSuccess(
+      `${selectedModule.title} için ${DIFFICULTY_LABELS[selectedModule.difficulty]} seviyesine uygun rastgele içerik ve egzersizler seçildi. Kaydetmeyi unutmayın.`
+    );
   };
 
   const handleToggleKind = (kind: ExerciseKind) => {
@@ -176,7 +244,7 @@ function SelectModuleExercisesContent() {
     setError(null);
     setSuccess(null);
     try {
-      if (!passages.some((passage) => passage.id === selectedPassageId)) {
+      if (!compatiblePassages.some((passage) => passage.id === selectedPassageId)) {
         setError("Modüle atanacak yayımlanmış bir okuma metni seçin.");
         setSaving(false);
         return;
@@ -206,7 +274,11 @@ function SelectModuleExercisesContent() {
       );
     } catch (saveError) {
       console.error("Modül egzersizleri kaydedilemedi:", saveError);
-      setError("Seçimler kaydedilemedi. Her seçili egzersiz türü için seviyeleri 1’den başlayarak kesintisiz seçin ve seviyelerin yayımlanmış olduğunu doğrulayın.");
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Seçimler kaydedilemedi. Her seçili egzersiz türü için yayımlanmış seviyeleri doğrulayın."
+      );
     } finally {
       setSaving(false);
     }
@@ -222,6 +294,9 @@ function SelectModuleExercisesContent() {
   const catalogReady = KIND_ORDER.every(
     (kind) => definitions.filter((definition) => definition.kind === kind && definition.status === "published").length === 5
   );
+  const compatiblePassages = passages.filter(
+    (passage) => passage.difficulty === selectedModule?.difficulty
+  );
 
   return (
     <div className="container mx-auto max-w-4xl space-y-8 px-4 py-10 sm:px-6 lg:px-8">
@@ -229,6 +304,7 @@ function SelectModuleExercisesContent() {
         <Badge variant="amber">Müfredat Düzenleme</Badge>
         <h1 className="text-3xl font-extrabold font-serif text-charcoal">Modül İçeriği ve Egzersizleri</h1>
         <p className="text-sm text-charcoal-muted">Modülde çalışılacak okuma metnini, egzersiz türlerini ve seviyelerini birlikte seçin. Seviye seçimi 1’den başlayarak kesintisiz olmalıdır; sonraki seviye bir önceki seviyede %70 alınca açılır.</p>
+        <p className="text-xs text-charcoal-muted">Rastgele atama, modül zorluğuyla eşleşen yayımlanmış bir metin ve zorluğa uygun dört egzersiz türü seçer.</p>
       </header>
 
       {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">{error}</p>}
@@ -250,6 +326,9 @@ function SelectModuleExercisesContent() {
               {modules.map((module) => <option key={module.id} value={module.id}>{module.title}</option>)}
             </select>
           </label>
+          <Button type="button" variant="amber" onClick={assignRandomContent} disabled={!selectedModule}>
+            Zorluk seviyesine göre rastgele ata
+          </Button>
           {modules.length === 0 ? (
             <p className="text-sm text-charcoal-muted">Henüz modül yok. Önce modül yönetiminden modül oluşturun.</p>
           ) : (
@@ -262,13 +341,13 @@ function SelectModuleExercisesContent() {
                   disabled={passages.length === 0}
                   className="w-full rounded-xl border border-sage-200 bg-white p-2.5"
                 >
-                  {passages.map((passage) => (
+                  {compatiblePassages.map((passage) => (
                     <option key={passage.id} value={passage.id}>{passage.title}</option>
                   ))}
                 </select>
-                {passages.length === 0 && (
+                {compatiblePassages.length === 0 && (
                   <span className="block text-xs text-red-700">
-                    Yayımlanmış okuma metni yok. Önce içerik yönetiminden bir metin yayımlayın.
+                    Bu zorluk seviyesinde yayımlanmış okuma metni yok. Önce aynı zorlukta bir metin yayımlayın.
                   </span>
                 )}
               </label>

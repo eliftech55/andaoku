@@ -192,6 +192,10 @@ export async function assignExercisesToModule(
   }
 
   const module = { id: moduleSnapshot.id, ...moduleSnapshot.data() } as LearningModule;
+  const passage = passageSnapshot.data() as ReadingPassage;
+  if (module.difficulty && passage.difficulty !== module.difficulty) {
+    throw new Error("Modül ve okuma metni zorluk seviyeleri aynı olmalıdır.");
+  }
   const normalizedLevels: Partial<Record<ExerciseKind, number[]>> = {};
   for (const kind of exerciseTypes) {
     const levels = Array.from(new Set(exerciseLevels[kind] || [])).sort(

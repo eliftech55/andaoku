@@ -22,9 +22,9 @@ const EDUCATION_LEVELS: { value: EducationLevel; label: string }[] = [
 ];
 
 const DIFFICULTIES: { value: DifficultyLevel; label: string }[] = [
-  { value: "beginner", label: "Başlangıç" },
+  { value: "beginner", label: "Kolay" },
   { value: "intermediate", label: "Orta" },
-  { value: "advanced", label: "İleri" },
+  { value: "advanced", label: "Zor" },
 ];
 
 const EXERCISE_LABELS: Record<ExerciseKind, string> = {
@@ -47,6 +47,10 @@ const EXERCISE_LABELS: Record<ExerciseKind, string> = {
   n_back: "Çift görev hafızası",
   visual_change: "Neyin değişti?",
 };
+
+function randomItem<T>(items: T[]): T | undefined {
+  return items.length ? items[Math.floor(Math.random() * items.length)] : undefined;
+}
 
 export default function ModuleManagementPage() {
   const { profile, loading: authLoading } = useAuth();
@@ -92,7 +96,11 @@ export default function ModuleManagementPage() {
         );
         const publishedPassages = passageList.filter((passage) => passage.status === "published");
         setPassages(publishedPassages);
-        setPassageId((current) => current || publishedPassages[0]?.id || "");
+        setPassageId((current) =>
+          current ||
+          randomItem(publishedPassages.filter((passage) => passage.difficulty === "beginner"))?.id ||
+          ""
+        );
       } catch (loadError) {
         console.error("Modüller yüklenemedi:", loadError);
         if (active) setError("Modüller yüklenemedi. Firestore bağlantısını ve yönetici erişimini kontrol edin.");
@@ -114,7 +122,7 @@ export default function ModuleManagementPage() {
     setEducationLevel("middle");
     setDuration(20);
     setTargetSkills("");
-    setPassageId(passages[0]?.id || "");
+    setPassageId(randomItem(passages.filter((passage) => passage.difficulty === "beginner"))?.id || "");
     setPrerequisites([]);
     setStatus("draft");
   };
@@ -177,6 +185,8 @@ export default function ModuleManagementPage() {
       setIsSaving(false);
     }
   };
+
+  const compatiblePassages = passages.filter((passage) => passage.difficulty === difficulty);
 
   if (authLoading || isLoading) {
     return <div className="container mx-auto px-4 py-10 text-center text-charcoal-muted">Modüller yükleniyor...</div>;
@@ -263,7 +273,19 @@ export default function ModuleManagementPage() {
               <div className="grid gap-4 sm:grid-cols-3">
                 <label className="space-y-1 text-sm font-medium">
                   Zorluk seviyesi
-                  <select value={difficulty} onChange={(event) => setDifficulty(event.target.value as DifficultyLevel)} className="w-full rounded-xl border border-sage-200 bg-white p-2.5">
+                  <select
+                    value={difficulty}
+                    onChange={(event) => {
+                      const nextDifficulty = event.target.value as DifficultyLevel;
+                      setDifficulty(nextDifficulty);
+                      setPassageId(
+                        randomItem(
+                          passages.filter((passage) => passage.difficulty === nextDifficulty)
+                        )?.id || ""
+                      );
+                    }}
+                    className="w-full rounded-xl border border-sage-200 bg-white p-2.5"
+                  >
                     {DIFFICULTIES.map((level) => <option key={level.value} value={level.value}>{level.label}</option>)}
                   </select>
                 </label>
@@ -285,9 +307,19 @@ export default function ModuleManagementPage() {
               </label>
               <label className="block space-y-1 text-sm font-medium">
                 Okuma egzersizi metni
-                <select required value={passageId} onChange={(event) => setPassageId(event.target.value)} className="w-full rounded-xl border border-sage-200 bg-white p-2.5">
-                  {passages.map((passage) => <option key={passage.id} value={passage.id}>{passage.title}</option>)}
+                <select
+                  required
+                  value={passageId}
+                  onChange={(event) => setPassageId(event.target.value)}
+                  className="w-full rounded-xl border border-sage-200 bg-white p-2.5"
+                >
+                {compatiblePassages.map((passage) => <option key={passage.id} value={passage.id}>{passage.title}</option>)}
                 </select>
+                {!compatiblePassages.length && (
+                  <span className="block text-xs text-red-700">
+                    Bu zorluk seviyesinde yayımlanmış okuma metni yok.
+                  </span>
+                )}
               </label>
               {modules.length > 0 && (
                 <fieldset className="space-y-2">
