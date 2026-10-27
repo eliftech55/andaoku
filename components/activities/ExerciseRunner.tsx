@@ -109,6 +109,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   const [flashWordRounds, setFlashWordRounds] = useState<FlashWordRound[]>([]);
   const [flashIndex, setFlashIndex] = useState(0);
   const [flashStage, setFlashStage] = useState<"show" | "choose">("show");
+  const [flashCountdown, setFlashCountdown] = useState(0);
   const [correctAnswers, setCorrectAnswers] = useState(0);
   const [summary, setSummary] = useState<ExerciseResult | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -189,6 +190,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       setFlashRounds([]);
       setFlashIndex(0);
       setFlashStage("show");
+      setFlashCountdown(Math.ceil(flashDuration / 1000));
     } else if (FLASH_LIKE_KINDS.includes(kind)) {
       const sourceWords = words.length ? words : DISTRACTORS[kind];
       const rounds = Array.from({ length: targetCount }, () => {
@@ -199,14 +201,25 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       setFlashRounds(rounds);
       setFlashIndex(0);
       setFlashStage("show");
+      setFlashCountdown(Math.ceil(flashDuration / 1000));
     }
     setPhase("playing");
   };
 
   useEffect(() => {
     if (phase !== "playing" || kind !== "flash_words" || flashStage !== "show") return;
-    const timer = window.setTimeout(() => setFlashStage("choose"), flashDuration);
-    return () => window.clearTimeout(timer);
+    setFlashCountdown(Math.ceil(flashDuration / 1000));
+    const timer = window.setInterval(() => {
+      setFlashCountdown((current) => {
+        if (current <= 1) {
+          window.clearInterval(timer);
+          setFlashStage("choose");
+          return 0;
+        }
+        return current - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(timer);
   }, [flashDuration, flashIndex, flashStage, kind, phase]);
 
   useEffect(() => {
@@ -344,7 +357,12 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
             <p className="text-xs text-charcoal-muted">Tur {flashIndex + 1}/{flashWordRounds.length} · {flashWordRounds[flashIndex].words.length} kelime</p>
             {flashStage === "show" ? (
               <>
-                <p className="text-sm font-semibold text-charcoal">Bu kelimeleri aklınızda tutun:</p>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-charcoal">Bu kelimeleri aklınızda tutun:</p>
+                  <span className="rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-sm font-bold tabular-nums text-amber-900" aria-live="polite">
+                    {flashCountdown} sn
+                  </span>
+                </div>
                 <div aria-live="polite" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                   {flashWordRounds[flashIndex].words.map((word) => (
                     <div key={word} className="rounded-lg border border-amber-200 bg-white px-3 py-3 text-lg font-bold text-brand-900">{word}</div>
