@@ -119,7 +119,7 @@ export default function StudentExercisesPage() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <CardTitle className="font-serif">{module.title}</CardTitle>
                 <Badge variant={moduleProgress?.status === "completed" ? "success" : "outline"}>
-                  Modül puanı {moduleProgress?.overallScore === undefined ? "bekleniyor" : `%${moduleProgress.overallScore}`}
+                  Modül puanı {typeof moduleProgress?.overallScore !== "number" ? "bekleniyor" : `%${moduleProgress.overallScore}`}
                 </Badge>
               </div>
               <p className="text-sm text-charcoal-muted">Okuma: {moduleProgress?.readingScore === undefined ? "bekleniyor" : `%${moduleProgress.readingScore}`} · Egzersiz: {moduleProgress?.exerciseScore === undefined ? "bekleniyor" : `%${moduleProgress.exerciseScore}`}</p>

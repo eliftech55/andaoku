@@ -175,7 +175,7 @@ export default function GelisimRaporlariPage() {
                     </td>
                     <td className="p-3.5 font-mono">{progress.readingScore === undefined ? "--" : `%${progress.readingScore}`}</td>
                     <td className="p-3.5 font-mono">{progress.exerciseScore === undefined ? "--" : `%${progress.exerciseScore}`}</td>
-                    <td className="p-3.5 font-mono font-bold text-brand-900">{progress.overallScore === undefined ? "--" : `%${progress.overallScore}`}</td>
+                    <td className="p-3.5 font-mono font-bold text-brand-900">{typeof progress.overallScore !== "number" ? "--" : `%${progress.overallScore}`}</td>
                     <td className="p-3.5">
                       <Badge variant={progress.status === "completed" ? "success" : "outline"}>
                         {progress.status === "completed" ? "Tamamlandı" : "Devam ediyor"}

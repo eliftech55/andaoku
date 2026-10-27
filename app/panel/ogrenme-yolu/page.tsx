@@ -291,7 +291,7 @@ export default function OgrenmeYoluPage() {
 
                   {moduleProgress && (
                     <p className="text-xs font-medium text-charcoal-muted">
-                      Modül puanı: {moduleProgress.overallScore === undefined ? "bekleniyor" : `%${moduleProgress.overallScore}`}
+                      Modül puanı: {typeof moduleProgress.overallScore !== "number" ? "bekleniyor" : `%${moduleProgress.overallScore}`}
                       {" · "}Okuma: {moduleProgress.readingScore === undefined ? "—" : `%${moduleProgress.readingScore}`}
                       {" · "}Egzersiz: {moduleProgress.exerciseScore === undefined ? "—" : `%${moduleProgress.exerciseScore}`}
                     </p>
