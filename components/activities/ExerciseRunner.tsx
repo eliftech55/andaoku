@@ -76,7 +76,7 @@ const FLASH_LIKE_KINDS: ExerciseKind[] = [
   "visual_change",
 ];
 
-const FLASH_WORD_DURATIONS = [3200, 2800, 2300, 1900, 1600];
+const FLASH_WORD_DURATIONS = [6000, 5500, 5000, 4500, 4000];
 
 export function ExerciseRunner({ activity, onComplete, nextActivityHref }: ExerciseRunnerProps) {
   const kind = activity.type as ExerciseKind;

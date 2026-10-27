@@ -1,11 +1,11 @@
 import { ExerciseDefinition, ExerciseKind } from "@/lib/types";
 
 const LEVELS = [
-  { level: 1, label: "Başlangıç", gridSize: 4, seconds: 50, targetCount: 5, sequenceLength: 4, flashDurationMs: 3200 },
-  { level: 2, label: "Kolay", gridSize: 5, seconds: 45, targetCount: 7, sequenceLength: 6, flashDurationMs: 2800 },
-  { level: 3, label: "Orta", gridSize: 6, seconds: 40, targetCount: 10, sequenceLength: 8, flashDurationMs: 2300 },
-  { level: 4, label: "Zor", gridSize: 7, seconds: 35, targetCount: 14, sequenceLength: 10, flashDurationMs: 1900 },
-  { level: 5, label: "Uzman", gridSize: 8, seconds: 30, targetCount: 18, sequenceLength: 12, flashDurationMs: 1600 },
+  { level: 1, label: "Başlangıç", gridSize: 4, seconds: 50, targetCount: 5, sequenceLength: 4, flashDurationMs: 6000 },
+  { level: 2, label: "Kolay", gridSize: 5, seconds: 45, targetCount: 7, sequenceLength: 6, flashDurationMs: 5500 },
+  { level: 3, label: "Orta", gridSize: 6, seconds: 40, targetCount: 10, sequenceLength: 8, flashDurationMs: 5000 },
+  { level: 4, label: "Zor", gridSize: 7, seconds: 35, targetCount: 14, sequenceLength: 10, flashDurationMs: 4500 },
+  { level: 5, label: "Uzman", gridSize: 8, seconds: 30, targetCount: 18, sequenceLength: 12, flashDurationMs: 4000 },
 ] as const;
 
 const EXERCISES: Record<
