@@ -305,8 +305,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       setMatchingMoves(0);
       setMatchingPairs(0);
     } else if (kind === "sequence_memory") {
-      const levelIndex = Math.min(5, Math.max(1, activity.level || 1)) - 1;
-      const sequenceLength = Math.min(8, 3 + levelIndex);
+      const sequenceLength = 1;
       const sequence = shuffled(Array.from({ length: 9 }, (_, index) => index)).slice(0, sequenceLength);
       setSequenceMemoryRound({
         sequence,
