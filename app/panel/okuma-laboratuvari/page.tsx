@@ -58,6 +58,7 @@ function OkumaLaboratuvariContent() {
   >([]);
   const [selectedPassage, setSelectedPassage] = useState<ReadingPassage | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [questionsLoading, setQuestionsLoading] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [selectedEyeExercise, setSelectedEyeExercise] =
     useState<"matrix" | EyeMovementExerciseType>("matrix");
@@ -127,15 +128,21 @@ function OkumaLaboratuvariContent() {
         setSelectedPassage(target);
         if (!target) {
           setQuestions([]);
+          setQuestionsLoading(false);
           return;
         }
+        setQuestionsLoading(true);
         const exerciseContent = exerciseList.find((content) => content.passage.id === target.id);
-        const qList = exerciseContent
+        const qList = exerciseContent?.questions.length
           ? exerciseContent.questions
           : await fetchQuestionsForPassage(target.id);
-        if (active) setQuestions(qList);
+        if (active) {
+          setQuestions(qList);
+          setQuestionsLoading(false);
+        }
       } catch (e) {
         console.error("Okuma laboratuvarı içeriği yüklenemedi:", e);
+        if (active) setQuestionsLoading(false);
       } finally {
         if (active) setLoading(false);
       }
@@ -149,11 +156,13 @@ function OkumaLaboratuvariContent() {
 
   const handlePassageSelect = async (p: ReadingPassage) => {
     setSelectedPassage(p);
+    setQuestionsLoading(true);
     const exerciseContent = exerciseContents.find((content) => content.passage.id === p.id);
-    const qList = exerciseContent
+    const qList = exerciseContent?.questions.length
       ? exerciseContent.questions
       : await fetchQuestionsForPassage(p.id);
     setQuestions(qList);
+    setQuestionsLoading(false);
   };
 
   const handleLabComplete = (result: {
@@ -334,7 +343,11 @@ function OkumaLaboratuvariContent() {
 
       {/* İÇERİK: LABORATUVAR VEYA MİNİ OYUN */}
       {activeTab === "reader" ? (
-        selectedPassage ? (
+        selectedPassage && questionsLoading ? (
+          <div className="rounded-2xl border border-sage-200 bg-white p-8 text-center text-charcoal-muted">
+            Okuma soruları hazırlanıyor...
+          </div>
+        ) : selectedPassage ? (
           <ReadingLab
             key={selectedActivity?.id || selectedPassage.id}
             passage={selectedPassage}
