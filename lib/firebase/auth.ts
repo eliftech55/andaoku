@@ -76,6 +76,22 @@ export async function signInUser(email: string, pass: string) {
     const userCredential = await signInWithEmailAndPassword(auth, email, pass);
     const user = userCredential.user;
     const profile = await getUserProfile(user.uid);
+    if (profile?.status === "pending_verification") {
+      await signOut(auth);
+      return {
+        user: null,
+        profile: null,
+        error: "Hesabınız yönetici onayı bekliyor. Onaylandıktan sonra giriş yapabilirsiniz.",
+      };
+    }
+    if (profile?.status === "suspended") {
+      await signOut(auth);
+      return {
+        user: null,
+        profile: null,
+        error: "Hesabınız askıya alınmış. Yöneticiyle iletişime geçin.",
+      };
+    }
     return { user, profile, error: null };
   } catch (error: unknown) {
     return { user: null, profile: null, error: getAuthErrorMessage(error, "login") };
@@ -117,7 +133,7 @@ export async function signUpUser(
       preferences: defaultPreferences,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      status: "active",
+      status: "pending_verification",
     };
 
     try {
@@ -153,7 +169,12 @@ export async function signUpUser(
       }
     }
 
-    return { user, profile: newProfile, error: null };
+    await signOut(auth);
+    return {
+      user: null,
+      profile: null,
+      error: "Kaydınız oluşturuldu. Yönetici onayından sonra giriş yapabilirsiniz.",
+    };
   } catch (error: unknown) {
     return { user: null, profile: null, error: getAuthErrorMessage(error, "signup") };
   }

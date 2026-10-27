@@ -171,6 +171,11 @@ export default function YonetimPaneliPage() {
               <FileText className="mr-1.5 h-4 w-4" /> İçerik Yönetimi
             </Button>
           </Link>
+          <Link href="/yonetim/kullanicilar">
+            <Button size="sm" variant="outline">
+              <Users className="mr-1.5 h-4 w-4" /> Kullanıcı Yönetimi
+            </Button>
+          </Link>
           <Link href="/yonetim/arastirma">
             <Button size="sm" variant="amber">
               <Database className="mr-1.5 h-4 w-4" /> Araştırma Portalı

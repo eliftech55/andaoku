@@ -289,6 +289,18 @@ export interface TeacherAssignment {
   status: "active" | "closed";
 }
 
+export interface UserAssignment {
+  id: string;
+  userId: string;
+  title: string;
+  description?: string;
+  activityId?: string;
+  assignedBy: string;
+  assignedAt: string;
+  dueAt?: string;
+  status: "active" | "completed" | "closed";
+}
+
 export interface AuditLog {
   id: string;
   actorId: string;

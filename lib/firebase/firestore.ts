@@ -25,12 +25,14 @@ import {
   ClassItem,
   ClassMembership,
   TeacherAssignment,
+  UserAssignment,
   AuditLog,
   EducationLevel,
   DifficultyLevel,
   ExerciseAttempt,
   ExerciseDefinition,
   ExerciseKind,
+  UserProfile,
 } from "../types";
 import { BUILT_IN_EXERCISE_DEFINITIONS } from "../services/exerciseCatalog";
 import { calculateModuleScore } from "../services/moduleScoring";
@@ -604,6 +606,43 @@ export async function createTeacherAssignment(assignment: Omit<TeacherAssignment
     return docRef.id;
   } catch (error) {
     console.error("Ödev atama hatası:", error);
+    throw error;
+  }
+}
+
+export async function getAllUserProfiles(): Promise<UserProfile[]> {
+  try {
+    const snapshot = await getDocs(collection(db, "users"));
+    return snapshot.docs.map((item) => item.data() as UserProfile);
+  } catch (error) {
+    console.error("Kullanıcı profilleri getirilemedi:", error);
+    throw error;
+  }
+}
+
+export async function updateUserStatus(
+  userId: string,
+  status: UserProfile["status"]
+): Promise<void> {
+  try {
+    await updateDoc(doc(db, "users", userId), {
+      status,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Kullanıcı durumu güncellenemedi:", error);
+    throw error;
+  }
+}
+
+export async function createUserAssignment(
+  assignment: Omit<UserAssignment, "id">
+): Promise<string> {
+  try {
+    const docRef = await addDoc(collection(db, "userAssignments"), assignment);
+    return docRef.id;
+  } catch (error) {
+    console.error("Kullanıcı görevi oluşturulamadı:", error);
     throw error;
   }
 }
