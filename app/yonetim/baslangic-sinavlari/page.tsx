@@ -765,6 +765,7 @@ export default function BaslangicSinavlariYonetimPage() {
               <p className="mt-1 text-charcoal-muted">
                 Konu ve seviyeye göre özgün okuma metni ile 10 soru taslak olarak hazırlanır.
                 Veritabanına yalnızca inceleyip onayladıktan sonra eklenir.
+                Bu işlem için yönetici yetkisi gerekir.
               </p>
             </div>
             {generationError && (
