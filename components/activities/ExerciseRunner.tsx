@@ -308,7 +308,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
 
   const handleSaccadeClick = (index: number) => {
     if (phase !== "playing") return;
-    if (sequence[index] !== sequence[sequenceIndex]) {
+    if (index !== sequence[sequenceIndex]) {
       wrongRef.current += 1;
       setSaccadeError(true);
       return;
