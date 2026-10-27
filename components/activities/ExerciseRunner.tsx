@@ -272,6 +272,9 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   };
 
   const title = activity.title;
+  const instructions = kind === "eye_saccade"
+    ? "Sarı noktayı gözlerinizle bulun, o noktaya tıklayın ve bir sonraki sarı noktaya geçin. Noktalar rastgele sıradadır; başınızı sabit tutup yalnızca gözlerinizi hızlı ve kontrollü biçimde hareket ettirin."
+    : activity.instructions;
   const progressCount = kind === "eye_saccade" ? sequenceIndex : FLASH_LIKE_KINDS.includes(kind) ? correctAnswers : selectedCells.length;
 
   return (
@@ -282,7 +285,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
           {phase === "playing" && <span className="flex items-center gap-1 text-sm font-mono"><Clock className="h-4 w-4" />{timeLeft} sn</span>}
         </div>
         <CardTitle className="font-serif">{title}</CardTitle>
-        <p className="text-sm text-charcoal-muted">{activity.instructions}</p>
+        <p className="text-sm text-charcoal-muted">{instructions}</p>
       </CardHeader>
       <CardContent className="space-y-5">
         {phase === "idle" && (
