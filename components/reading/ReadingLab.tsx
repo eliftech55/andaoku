@@ -200,7 +200,7 @@ export function ReadingLab({
     const currentUserId = user?.uid || profile?.uid;
     if (persistResults && currentUserId) {
       try {
-        await saveReadingSession({
+        const readingSessionId = await saveReadingSession({
           userId: currentUserId,
           passageId: passage.id,
           passageVersion: passage.version || 1,
@@ -220,6 +220,7 @@ export function ReadingLab({
             assessmentType: "practice",
             passageId: passage.id,
             passageVersion: passage.version || 1,
+            readingSessionId,
             wordCount,
             durationSeconds: secondsElapsed,
             wpm,

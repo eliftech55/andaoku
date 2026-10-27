@@ -77,7 +77,24 @@ export default function UserDashboardPage() {
     loadData();
   }, [user, profile]);
 
-  const latestResult = assessmentResults.length > 0 ? assessmentResults[0] : null;
+  const latestReadingSession = [...readingSessions]
+    .filter((session) => session.status === "completed")
+    .sort((left, right) =>
+      String(right.completedAt || right.createdAt).localeCompare(
+        String(left.completedAt || left.createdAt)
+      )
+    )[0] || null;
+  const latestResult = latestReadingSession
+    ? [...assessmentResults]
+      .filter(
+        (result) =>
+          result.assessmentType === "practice" &&
+          result.passageId === latestReadingSession.passageId
+      )
+      .sort((left, right) =>
+        String(right.createdAt).localeCompare(String(left.createdAt))
+      )[0] || null
+    : null;
   const completedModulesCount = progressList.filter((p) => p.status === "completed").length;
   const totalActivitiesCount = readingSessions.length;
   const displayName =
@@ -128,11 +145,11 @@ export default function UserDashboardPage() {
               <TrendingUp className="h-4 w-4 text-brand-700" />
             </div>
             <div className="text-2xl sm:text-3xl font-extrabold font-mono text-charcoal">
-              {latestResult ? `${latestResult.wpm} ` : "-- "}
+              {latestReadingSession ? `${latestReadingSession.wpm} ` : "-- "}
               <span className="text-xs font-sans text-charcoal-muted font-normal">WPM</span>
             </div>
             <p className="text-[11px] text-charcoal-muted">
-              {latestResult ? "Dakika başına kelime" : "Ölçüm bekleniyor"}
+              {latestReadingSession ? "Dakika başına kelime" : "Ölçüm bekleniyor"}
             </p>
           </CardContent>
         </Card>
