@@ -4,6 +4,7 @@ interface ModuleScoreInput {
   readingScore?: number;
   exerciseTypes: ExerciseKind[];
   bestExerciseScores: Partial<Record<ExerciseKind, number>>;
+  requiredCompletionScore?: number;
 }
 
 interface ModuleScore {
@@ -16,6 +17,7 @@ export function calculateModuleScore({
   readingScore,
   exerciseTypes,
   bestExerciseScores,
+  requiredCompletionScore = 70,
 }: ModuleScoreInput): ModuleScore {
   const exerciseScore = exerciseTypes.length
     ? Math.round(
@@ -36,7 +38,7 @@ export function calculateModuleScore({
       readingScore !== undefined &&
       hasCompletedAllExerciseTypes &&
       overallScore !== null &&
-      overallScore >= 70,
+      overallScore >= requiredCompletionScore,
   };
 }
 

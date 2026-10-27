@@ -258,13 +258,25 @@ export default function UserDashboardPage() {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 pt-2">
             {modules.map((module) => {
               const progress = progressList.find((item) => item.moduleId === module.id);
-              const isCompleted = progress?.status === "completed";
+              const requiredScore = module.requiredCompletionScore ?? 70;
+              const isCompleted =
+                progress?.status === "completed" &&
+                (progress.overallScore ?? 0) >= requiredScore;
               const isUnlocked =
                 !module.prerequisites?.length ||
                 module.prerequisites.every((prerequisite) =>
-                  progressList.some(
-                    (item) => item.moduleId === prerequisite && item.status === "completed"
-                  )
+                  modules.some((prerequisiteModule) => prerequisiteModule.id === prerequisite) &&
+                  (() => {
+                    const prerequisiteModule = modules.find((item) => item.id === prerequisite);
+                    const prerequisiteProgress = progressList.find(
+                      (item) => item.moduleId === prerequisite
+                    );
+                    return (
+                      prerequisiteProgress?.status === "completed" &&
+                      (prerequisiteProgress.overallScore ?? 0) >=
+                        (prerequisiteModule?.requiredCompletionScore ?? 70)
+                    );
+                  })()
                 );
               const content = (
                 <span className="flex h-full flex-col justify-between gap-3">

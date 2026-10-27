@@ -39,6 +39,18 @@ describe("module scoring", () => {
     expect(result.isComplete).toBe(true);
   });
 
+  it("uses the module-specific completion threshold", () => {
+    const result = calculateModuleScore({
+      readingScore: 70,
+      exerciseTypes: ["peripheral_vision"],
+      bestExerciseScores: { peripheral_vision: 70 },
+      requiredCompletionScore: 75,
+    });
+
+    expect(result.overallScore).toBe(70);
+    expect(result.isComplete).toBe(false);
+  });
+
   it("requires a score for every assigned exercise kind", () => {
     const result = calculateModuleScore({
       readingScore: 100,

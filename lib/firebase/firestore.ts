@@ -478,6 +478,7 @@ export async function saveExerciseAttempt(
       readingScore: existingProgress?.readingScore,
       exerciseTypes: module?.exerciseTypes || [],
       bestExerciseScores,
+      requiredCompletionScore: module?.requiredCompletionScore ?? 70,
     });
     const now = new Date().toISOString();
     await setDoc(doc(db, "userProgress", `${attempt.userId}_${attempt.moduleId}`), {
@@ -523,6 +524,7 @@ export async function saveModuleReadingScore(
     readingScore: bestReadingScore,
     exerciseTypes: module?.exerciseTypes || [],
     bestExerciseScores,
+    requiredCompletionScore: module?.requiredCompletionScore ?? 70,
   });
   const now = new Date().toISOString();
   await setDoc(doc(db, "userProgress", `${userId}_${moduleId}`), {

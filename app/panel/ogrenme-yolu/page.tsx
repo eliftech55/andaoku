@@ -80,7 +80,15 @@ export default function OgrenmeYoluPage() {
   }, [user, profile]);
 
   const completedModuleIds = new Set(
-    progressList.filter((p) => p.status === "completed").map((p) => p.moduleId)
+    modules
+      .filter((module) => {
+        const progress = progressList.find((item) => item.moduleId === module.id);
+        return (
+          progress?.status === "completed" &&
+          (progress.overallScore ?? 0) >= (module.requiredCompletionScore ?? 70)
+        );
+      })
+      .map((module) => module.id)
   );
 
   const getModuleIcon = (order: number) => {

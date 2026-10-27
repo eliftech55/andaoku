@@ -19,6 +19,20 @@ const EXERCISE_KINDS: ExerciseKind[] = [
   "target_scan",
   "eye_saccade",
   "flash_words",
+  "point_tracking",
+  "infinity_tracking",
+  "chunk_reading",
+  "pacer_reading",
+  "schulte_table",
+  "regression_prevention",
+  "digit_memory",
+  "word_memory",
+  "matching_cards",
+  "sequence_memory",
+  "passage_memory",
+  "memory_palace",
+  "n_back",
+  "visual_change",
 ];
 
 export default function RunExercisePage() {
