@@ -18,8 +18,6 @@ import {
   fetchPassageById,
   fetchQuestionsForPassage,
 } from "@/lib/services/contentService";
-import { upsertUserProgress } from "@/lib/firebase/firestore";
-import { useAuth } from "@/contexts/AuthContext";
 import { Activity, ReadingPassage, Question } from "@/lib/types";
 
 export default function OkumaLaboratuvariPage() {
@@ -38,7 +36,6 @@ export default function OkumaLaboratuvariPage() {
 
 function OkumaLaboratuvariContent() {
   const searchParams = useSearchParams();
-  const { user, profile } = useAuth();
   const initialTab = searchParams.get("tab") === "minigame" ? "minigame" : "reader";
 
   const [activeTab, setActiveTab] = useState<"reader" | "minigame">(initialTab);
@@ -111,30 +108,6 @@ function OkumaLaboratuvariContent() {
       ? exerciseContent.questions
       : await fetchQuestionsForPassage(p.id);
     setQuestions(qList);
-  };
-
-  const handleVisualExerciseComplete = async (result: {
-    accuracy: number;
-    totalFound: number;
-    timeSeconds: number;
-  }) => {
-    const moduleId = selectedActivity?.moduleId;
-    if (!moduleId) return;
-
-    try {
-      await upsertUserProgress({
-        userId: user?.uid || profile?.uid || "misafir-okur",
-        moduleId,
-        activityId: selectedActivity.id,
-        status: "in_progress",
-        completionPercentage: result.accuracy,
-        attemptCount: 1,
-        lastActivityAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-    } catch (error) {
-      console.error("Göz egzersizi ilerlemesi kaydedilemedi:", error);
-    }
   };
 
   return (
@@ -216,6 +189,7 @@ function OkumaLaboratuvariContent() {
             activityId={selectedActivity?.id}
             readingPacingWpm={selectedActivity?.contentConfig.speedPacingWpm}
             chunkSize={selectedActivity?.contentConfig.chunkSize}
+            persistResults={false}
           />
         ) : (
           <div className="p-8 text-center text-charcoal-muted">
@@ -268,13 +242,11 @@ function OkumaLaboratuvariContent() {
               key={`${selectedActivity?.id || "default"}-matrix`}
               targetSymbol={selectedActivity?.contentConfig.targetSymbol}
               instructions={selectedActivity?.instructions}
-              onComplete={handleVisualExerciseComplete}
             />
           ) : (
             <EyeMovementExercise
               key={selectedEyeExercise}
               type={selectedEyeExercise}
-              onComplete={handleVisualExerciseComplete}
             />
           )}
         </div>

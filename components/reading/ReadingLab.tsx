@@ -32,6 +32,7 @@ interface ReadingLabProps {
   activityId?: string;
   readingPacingWpm?: number;
   chunkSize?: number;
+  persistResults?: boolean;
   onComplete?: (result: { wpm: number; comprehensionScore: number; durationSeconds: number }) => void;
 }
 
@@ -43,6 +44,7 @@ export function ReadingLab({
   activityId,
   readingPacingWpm = 250,
   chunkSize = 2,
+  persistResults = true,
   onComplete,
 }: ReadingLabProps) {
   const { user, profile, updatePreferences } = useAuth();
@@ -195,45 +197,46 @@ export function ReadingLab({
     setResults(calculated);
     setReadingState("result");
 
-    // Firestore'a kaydet (Oturum açılmışsa)
-    const currentUserId = user?.uid || profile?.uid || "misafir-okur";
-    try {
-      await saveReadingSession({
-        userId: currentUserId,
-        passageId: passage.id,
-        passageVersion: passage.version || 1,
-        ...(activityId ? { activityId } : {}),
-        startedAt: new Date(Date.now() - secondsElapsed * 1000).toISOString(),
-        completedAt: new Date().toISOString(),
-        durationSeconds: secondsElapsed,
-        wordCount,
-        wpm,
-        status: "completed",
-        createdAt: new Date().toISOString(),
-      });
-
-      if (questions.length > 0) {
-        await saveAssessmentResult({
+    if (persistResults) {
+      const currentUserId = user?.uid || profile?.uid || "misafir-okur";
+      try {
+        await saveReadingSession({
           userId: currentUserId,
-          assessmentType: "practice",
           passageId: passage.id,
           passageVersion: passage.version || 1,
-          wordCount,
+          ...(activityId ? { activityId } : {}),
+          startedAt: new Date(Date.now() - secondsElapsed * 1000).toISOString(),
+          completedAt: new Date().toISOString(),
           durationSeconds: secondsElapsed,
+          wordCount,
           wpm,
-          correctCount,
-          incorrectCount,
-          unansweredCount,
-          gradableQuestionCount: questions.length,
-          comprehensionScore,
-          userAnswers,
+          status: "completed",
           createdAt: new Date().toISOString(),
         });
-      }
 
-      await saveModuleReadingScore(currentUserId, moduleId || "modul-1", comprehensionScore);
-    } catch (e) {
-      console.warn("Sonuçlar Firestore'a kaydedilirken not:", e);
+        if (questions.length > 0) {
+          await saveAssessmentResult({
+            userId: currentUserId,
+            assessmentType: "practice",
+            passageId: passage.id,
+            passageVersion: passage.version || 1,
+            wordCount,
+            durationSeconds: secondsElapsed,
+            wpm,
+            correctCount,
+            incorrectCount,
+            unansweredCount,
+            gradableQuestionCount: questions.length,
+            comprehensionScore,
+            userAnswers,
+            createdAt: new Date().toISOString(),
+          });
+        }
+
+        await saveModuleReadingScore(currentUserId, moduleId || "modul-1", comprehensionScore);
+      } catch (e) {
+        console.warn("Sonuçlar Firestore'a kaydedilirken not:", e);
+      }
     }
 
     if (onComplete) {

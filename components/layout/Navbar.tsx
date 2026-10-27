@@ -16,25 +16,14 @@ import {
   Settings,
   Shield,
   LogOut,
-  UserCheck,
 } from "lucide-react";
-import { UserRole } from "@/lib/types";
 
 export function Navbar() {
   const pathname = usePathname();
-  const { profile, logout, switchDemoRole } = useAuth();
+  const { profile, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
 
   const isActive = (path: string) => pathname === path;
-
-  const roles: { role: UserRole; label: string }[] = [
-    { role: "learner", label: "Öğrenci / Okur" },
-    { role: "teacher", label: "Öğretmen" },
-    { role: "content_manager", label: "İçerik Yöneticisi" },
-    { role: "admin", label: "Yönetici" },
-    { role: "researcher", label: "Araştırmacı" },
-  ];
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-sage-200/80 bg-ivory/90 backdrop-blur-md">
@@ -89,35 +78,37 @@ export function Navbar() {
             Kütüphane
           </Link>
 
-          {profile && (
-            <>
-              <Link
-                href="/panel"
-                className={`transition-colors hover:text-brand-700 ${
-                  isActive("/panel") ? "text-brand-800 font-semibold" : "text-charcoal-muted"
-                }`}
-              >
-                Panelim
-              </Link>
-              <Link
-                href="/panel/okuma-laboratuvari"
-                className={`transition-colors hover:text-brand-700 ${
-                  isActive("/panel/okuma-laboratuvari") ? "text-brand-800 font-semibold" : "text-charcoal-muted"
-                }`}
-              >
-                Laboratuvar
-              </Link>
-              <Link
-                href="/panel/baslangic-sinavi"
-                className={`transition-colors hover:text-brand-700 flex items-center gap-1 font-semibold ${
-                  isActive("/panel/baslangic-sinavi") ? "text-amber-700" : "text-amber-800"
-                }`}
-              >
-                <span>Başlangıç Sınavı</span>
-                <Badge variant="amber" className="text-[9px] px-1.5 py-0">Seviye Tespit</Badge>
-              </Link>
-            </>
-          )}
+          <>
+            <Link
+              href="/panel/okuma-laboratuvari"
+              className={`transition-colors hover:text-brand-700 ${
+                isActive("/panel/okuma-laboratuvari") ? "text-brand-800 font-semibold" : "text-charcoal-muted"
+              }`}
+            >
+              Laboratuvar
+            </Link>
+            {profile && (
+              <>
+                <Link
+                  href="/panel"
+                  className={`transition-colors hover:text-brand-700 ${
+                    isActive("/panel") ? "text-brand-800 font-semibold" : "text-charcoal-muted"
+                  }`}
+                >
+                  Panelim
+                </Link>
+                <Link
+                  href="/panel/baslangic-sinavi"
+                  className={`transition-colors hover:text-brand-700 flex items-center gap-1 font-semibold ${
+                    isActive("/panel/baslangic-sinavi") ? "text-amber-700" : "text-amber-800"
+                  }`}
+                >
+                  <span>Başlangıç Sınavı</span>
+                  <Badge variant="amber" className="text-[9px] px-1.5 py-0">Seviye Tespit</Badge>
+                </Link>
+              </>
+            )}
+          </>
 
           {profile?.role === "teacher" && (
             <Link
@@ -144,47 +135,8 @@ export function Navbar() {
           )}
         </nav>
 
-        {/* Sağ Alan: Hızlı Rol Değiştirici ve Kullanıcı / Giriş Butonları */}
+        {/* Sağ Alan: Kullanıcı / Giriş Butonları */}
         <div className="hidden md:flex items-center gap-3">
-          {/* Hızlı Rol Seçici (İnceleme ve test için) */}
-          <div className="relative">
-            <button
-              onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
-              className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg border border-sage-200 bg-ivory-warm text-charcoal hover:bg-ivory-beige transition-colors"
-              title="Rolü Değiştir (Test & İnceleme)"
-            >
-              <UserCheck className="h-3.5 w-3.5 text-brand-700" />
-              <span className="font-semibold capitalize">
-                {profile ? profile.role : "Rol Seç"}
-              </span>
-            </button>
-
-            {roleDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-48 rounded-xl bg-white p-2 shadow-xl border border-sage-200 z-50 animate-fade-in">
-                <div className="px-2 py-1 text-[11px] font-semibold text-charcoal-muted border-b border-sage-100 mb-1">
-                  ROL SEÇİCİ (TEST MODU)
-                </div>
-                {roles.map((r) => (
-                  <button
-                    key={r.role}
-                    onClick={() => {
-                      switchDemoRole(r.role);
-                      setRoleDropdownOpen(false);
-                    }}
-                    className={`w-full text-left px-2 py-1.5 text-xs rounded-lg transition-colors flex items-center justify-between ${
-                      profile?.role === r.role
-                        ? "bg-brand-50 text-brand-800 font-bold"
-                        : "hover:bg-ivory-beige text-charcoal"
-                    }`}
-                  >
-                    <span>{r.label}</span>
-                    {profile?.role === r.role && <Badge variant="secondary" className="text-[9px]">Aktif</Badge>}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
           {profile ? (
             <div className="flex items-center gap-2">
               <Link href="/panel/profil">
@@ -281,24 +233,6 @@ export function Navbar() {
           </Link>
 
           <div className="pt-3 border-t border-sage-200 flex flex-col gap-2">
-            <div className="text-xs font-semibold text-charcoal-muted px-1">ROL SEÇİMİ</div>
-            <div className="grid grid-cols-2 gap-1.5">
-              {roles.map((r) => (
-                <button
-                  key={r.role}
-                  onClick={() => {
-                    switchDemoRole(r.role);
-                    setMobileMenuOpen(false);
-                  }}
-                  className={`px-2 py-1 text-xs rounded border text-left ${
-                    profile?.role === r.role ? "bg-brand-700 text-white font-bold" : "bg-white text-charcoal"
-                  }`}
-                >
-                  {r.label}
-                </button>
-              ))}
-            </div>
-
             {profile ? (
               <Button variant="outline" size="sm" onClick={() => logout()} className="w-full mt-2">
                 Çıkış Yap
