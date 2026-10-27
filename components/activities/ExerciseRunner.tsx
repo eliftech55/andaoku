@@ -107,10 +107,12 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     gridSize * gridSize - 1,
     Math.max(3, activity.contentConfig.targetCount || 5)
   );
-  const durationLimit = Math.min(
-    180,
-    Math.max(kind === "word_memory" ? 75 : 10, activity.contentConfig.timeLimitSeconds || 60)
-  );
+  const durationLimit = kind === "matching_cards"
+    ? 75
+    : Math.min(
+      180,
+      Math.max(kind === "word_memory" ? 75 : 10, activity.contentConfig.timeLimitSeconds || 60)
+    );
   const sequenceLength = Math.min(20, Math.max(3, activity.contentConfig.sequenceLength || 4));
   const flashDuration = kind === "flash_words"
     ? FLASH_WORD_DURATIONS[Math.min(5, Math.max(1, activity.level || 1)) - 1]
