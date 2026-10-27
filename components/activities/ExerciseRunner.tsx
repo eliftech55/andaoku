@@ -76,6 +76,8 @@ const FLASH_LIKE_KINDS: ExerciseKind[] = [
   "visual_change",
 ];
 
+const FLASH_WORD_DURATIONS = [3200, 2800, 2300, 1900, 1600];
+
 export function ExerciseRunner({ activity, onComplete, nextActivityHref }: ExerciseRunnerProps) {
   const kind = activity.type as ExerciseKind;
   const targetSymbol = activity.contentConfig.targetSymbol || (kind === "target_scan" ? "A" : "●");
@@ -86,7 +88,9 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   );
   const durationLimit = Math.min(180, Math.max(10, activity.contentConfig.timeLimitSeconds || 60));
   const sequenceLength = Math.min(20, Math.max(3, activity.contentConfig.sequenceLength || 4));
-  const flashDuration = Math.min(3000, Math.max(200, activity.contentConfig.flashDurationMs || 1000));
+  const flashDuration = kind === "flash_words"
+    ? FLASH_WORD_DURATIONS[Math.min(5, Math.max(1, activity.level || 1)) - 1]
+    : Math.min(3000, Math.max(200, activity.contentConfig.flashDurationMs || 1000));
   const words = activity.contentConfig.wordList?.length
     ? activity.contentConfig.wordList
     : DISTRACTORS[kind];
@@ -168,7 +172,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       setSequenceIndex(0);
     } else if (kind === "flash_words") {
       const sourceWords = Array.from(new Set(words.length ? words : DISTRACTORS.flash_words));
-      const wordCount = Math.max(5, sequenceLength);
+      const wordCount = Math.max(4, sequenceLength - 1);
       const rounds = Array.from({ length: targetCount }, () => {
         const roundWords = shuffled(sourceWords).slice(0, wordCount);
         const usedWords = new Set(roundWords);
