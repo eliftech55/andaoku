@@ -210,6 +210,7 @@ export function ReadingLab({
           durationSeconds: secondsElapsed,
           wordCount,
           wpm,
+          comprehensionScore,
           status: "completed",
           createdAt: new Date().toISOString(),
         });

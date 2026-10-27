@@ -89,12 +89,22 @@ export default function UserDashboardPage() {
       .filter(
         (result) =>
           result.assessmentType === "practice" &&
-          result.passageId === latestReadingSession.passageId
+          result.readingSessionId === latestReadingSession.id
       )
-      .sort((left, right) =>
-        String(right.createdAt).localeCompare(String(left.createdAt))
-      )[0] || null
+      .sort((left, right) => String(right.createdAt).localeCompare(String(left.createdAt)))[0]
+      || [...assessmentResults]
+        .filter(
+          (result) =>
+            result.assessmentType === "practice" &&
+            !result.readingSessionId &&
+            result.passageId === latestReadingSession.passageId &&
+            String(result.createdAt) <= String(latestReadingSession.completedAt)
+        )
+        .sort((left, right) => String(right.createdAt).localeCompare(String(left.createdAt)))[0]
+      || null
     : null;
+  const latestComprehensionScore = latestReadingSession?.comprehensionScore
+    ?? latestResult?.comprehensionScore;
   const completedModulesCount = progressList.filter((p) => p.status === "completed").length;
   const totalActivitiesCount = readingSessions.length;
   const displayName =
@@ -162,10 +172,14 @@ export default function UserDashboardPage() {
               <Award className="h-4 w-4 text-amber-600" />
             </div>
             <div className="text-2xl sm:text-3xl font-extrabold font-mono text-amber-600">
-              {latestResult ? `%${latestResult.comprehensionScore}` : "--"}
+              {latestComprehensionScore !== undefined ? `%${latestComprehensionScore}` : "--"}
             </div>
             <p className="text-[11px] text-charcoal-muted">
-              {latestResult ? `${latestResult.correctCount} doğru yanıt` : "Ölçüm bekleniyor"}
+              {latestResult
+                ? `${latestResult.correctCount} doğru yanıt`
+                : latestComprehensionScore !== undefined
+                  ? "Son okuma sonucu"
+                  : "Ölçüm bekleniyor"}
             </p>
           </CardContent>
         </Card>

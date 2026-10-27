@@ -240,6 +240,7 @@ export interface ReadingSession {
   durationSeconds: number;
   wordCount: number;
   wpm: number;
+  comprehensionScore?: number;
   status: "completed" | "abandoned";
   createdAt: string;
 }
