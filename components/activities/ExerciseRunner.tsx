@@ -20,6 +20,12 @@ interface ChunkRound {
   choices: string[][];
 }
 
+interface PassageMemoryRound {
+  passage: string;
+  correctAnswer: string;
+  choices: string[];
+}
+
 interface ExerciseRunnerProps {
   activity: Activity;
   onComplete: (result: ExerciseResult) => Promise<void>;
@@ -128,6 +134,8 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     ? FLASH_WORD_DURATIONS[Math.min(5, Math.max(1, activity.level || 1)) - 1]
     : kind === "chunk_reading"
       ? 2500
+    : kind === "passage_memory"
+      ? 5000
     : Math.min(3000, Math.max(200, activity.contentConfig.flashDurationMs || 1000));
   const wordMemoryDuration = WORD_MEMORY_DURATIONS[Math.min(5, Math.max(1, activity.level || 1)) - 1];
   const words = activity.contentConfig.wordList?.length
@@ -146,6 +154,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   const [flashRounds, setFlashRounds] = useState<FlashRound[]>([]);
   const [flashWordRounds, setFlashWordRounds] = useState<FlashWordRound[]>([]);
   const [chunkRounds, setChunkRounds] = useState<ChunkRound[]>([]);
+  const [passageMemoryRounds, setPassageMemoryRounds] = useState<PassageMemoryRound[]>([]);
   const [wordMemoryRounds, setWordMemoryRounds] = useState<WordMemoryRound[]>([]);
   const [memoryPalaceRounds, setMemoryPalaceRounds] = useState<MemoryPalaceRound[]>([]);
   const [matchingCards, setMatchingCards] = useState<MatchingCard[]>([]);
@@ -217,6 +226,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     setWordMemoryInputs([]);
     setFlashIndex(0);
     setChunkRounds([]);
+    setPassageMemoryRounds([]);
     setMatchingCards([]);
     setMatchingFirst(null);
     setMatchingBusy(false);
@@ -374,6 +384,27 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       setFlashIndex(0);
       setFlashStage("show");
       setFlashCountdown(Math.ceil(flashDuration / 1000));
+    } else if (kind === "passage_memory") {
+      const passages = [
+        "Düzenli okuma, kelime dağarcığını geliştirir ve bilgiyi daha kolay hatırlamayı sağlar.",
+        "Arılar çiçeklerden nektar toplar ve bitkilerin tozlaşmasına yardımcı olur.",
+        "Su döngüsünde güneş, suyun buharlaşmasını ve bulutların oluşmasını sağlar.",
+        "Kütüphaneler, farklı konularda bilgi edinmek isteyen herkes için önemli kaynaklardır.",
+        "Bir hedefe ulaşmak için plan yapmak ve küçük adımlarla ilerlemek önemlidir.",
+      ];
+      const rounds = passages.map((passage, index) => {
+        const correct = passage.split(" ").slice(0, 3).join(" ");
+        const distractors = [
+          passage.split(" ").slice(-3).join(" "),
+          `${index % 2 === 0 ? "Düzenli" : "Doğal"} çalışmalar yeni bilgiler kazandırır.`,
+          "Bu bilgi metinde yer almamaktadır.",
+        ];
+        return { passage, correctAnswer: correct, choices: shuffled([correct, ...distractors]) };
+      });
+      setPassageMemoryRounds(rounds);
+      setFlashIndex(0);
+      setFlashStage("show");
+      setFlashCountdown(Math.ceil(flashDuration / 1000));
     } else if (FLASH_LIKE_KINDS.includes(kind)) {
       const sourceWords = words.length ? words : DISTRACTORS[kind];
       const rounds = Array.from({ length: EXERCISE_ROUND_COUNT }, () => {
@@ -390,7 +421,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   };
 
   useEffect(() => {
-    if (phase !== "playing" || !["flash_words", "word_memory", "memory_palace", "chunk_reading"].includes(kind) || flashStage !== "show") return;
+    if (phase !== "playing" || !["flash_words", "word_memory", "memory_palace", "chunk_reading", "passage_memory"].includes(kind) || flashStage !== "show") return;
     const displayDuration = kind === "word_memory" ? wordMemoryDuration : kind === "memory_palace" ? 5000 : flashDuration;
     setFlashCountdown(Math.ceil(displayDuration / 1000));
     const timer = window.setInterval(() => {
@@ -513,6 +544,25 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     const next = flashIndex + 1;
     if (next >= chunkRounds.length) {
       finish(correctRef.current, wrongRef.current, chunkRounds.length);
+      return;
+    }
+    setFlashIndex(next);
+    setFlashStage("show");
+    setFlashCountdown(Math.ceil(flashDuration / 1000));
+  };
+
+  const handlePassageMemoryChoice = (choice: string) => {
+    if (phase !== "playing" || kind !== "passage_memory" || flashStage !== "choose") return;
+    const round = passageMemoryRounds[flashIndex];
+    if (choice === round?.correctAnswer) {
+      correctRef.current += 1;
+      setCorrectAnswers(correctRef.current);
+    } else {
+      wrongRef.current += 1;
+    }
+    const next = flashIndex + 1;
+    if (next >= passageMemoryRounds.length) {
+      finish(correctRef.current, wrongRef.current, passageMemoryRounds.length);
       return;
     }
     setFlashIndex(next);
@@ -741,6 +791,33 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
                   {chunkRounds[flashIndex].choices.map((choice) => (
                     <Button key={choice.join("-")} variant="outline" onClick={() => handleChunkChoice(choice)}>
                       {choice.join(" • ")}
+                    </Button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {phase === "playing" && kind === "passage_memory" && passageMemoryRounds[flashIndex] && (
+          <div className="space-y-4 rounded-xl bg-ivory-warm p-6 text-center">
+            {flashStage === "show" ? (
+              <>
+                <p className="text-sm font-semibold text-charcoal">Metni dikkatle okuyun ve ana bilgiyi hatırlayın.</p>
+                <div className="flex min-h-36 items-center justify-center rounded-xl border border-amber-200 bg-white p-5 text-left text-base leading-relaxed text-brand-900">
+                  {passageMemoryRounds[flashIndex].passage}
+                </div>
+                <span className="inline-block rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-sm font-bold tabular-nums text-amber-900" aria-live="polite">
+                  {flashCountdown} sn
+                </span>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-semibold text-charcoal">Metinde geçen ana bilgi hangisiydi?</p>
+                <div className="grid gap-3">
+                  {passageMemoryRounds[flashIndex].choices.map((choice) => (
+                    <Button key={choice} variant="outline" onClick={() => handlePassageMemoryChoice(choice)}>
+                      {choice}
                     </Button>
                   ))}
                 </div>
@@ -1032,7 +1109,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
           </div>
         )}
 
-        {phase === "playing" && !["matching_cards", "flash_words", "word_memory", "chunk_reading"].includes(kind) && FLASH_LIKE_KINDS.includes(kind) && flashRounds[flashIndex] && (
+        {phase === "playing" && !["matching_cards", "flash_words", "word_memory", "chunk_reading", "passage_memory"].includes(kind) && FLASH_LIKE_KINDS.includes(kind) && flashRounds[flashIndex] && (
           <div className="space-y-4 rounded-xl bg-ivory-warm p-6 text-center">
             {flashStage === "show" ? (
               <div aria-live="polite" className="flex min-h-36 items-center justify-center text-3xl font-extrabold text-brand-900">{flashRounds[flashIndex].word}</div>
