@@ -314,8 +314,17 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
 
     const expected = wordMemoryRounds[flashIndex]?.words ?? [];
     const answer = wordMemoryInputs.map((word) => word.trim().toLocaleLowerCase("tr-TR"));
-    const isCorrect = answer.length === expected.length
-      && answer.every((word, index) => word === expected[index].toLocaleLowerCase("tr-TR"));
+    const expectedCounts = new Map<string, number>();
+    expected.forEach((word) => {
+      const normalizedWord = word.toLocaleLowerCase("tr-TR");
+      expectedCounts.set(normalizedWord, (expectedCounts.get(normalizedWord) || 0) + 1);
+    });
+    const isCorrect = answer.length === expected.length && answer.every((word) => {
+      const remaining = expectedCounts.get(word) || 0;
+      if (remaining === 0) return false;
+      expectedCounts.set(word, remaining - 1);
+      return true;
+    });
 
     if (isCorrect) {
       correctRef.current += 1;
