@@ -36,6 +36,12 @@ interface WordMemoryRound {
   words: string[];
 }
 
+interface MemoryPalaceRound {
+  object: string;
+  location: string;
+  choices: string[];
+}
+
 const DISTRACTORS: Record<ExerciseKind, string[]> = {
   peripheral_vision: ["▲", "■", "◆", "✦", "●", "○"],
   target_scan: ["R", "H", "K", "4", "Λ", "A"],
@@ -119,6 +125,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   const [flashRounds, setFlashRounds] = useState<FlashRound[]>([]);
   const [flashWordRounds, setFlashWordRounds] = useState<FlashWordRound[]>([]);
   const [wordMemoryRounds, setWordMemoryRounds] = useState<WordMemoryRound[]>([]);
+  const [memoryPalaceRounds, setMemoryPalaceRounds] = useState<MemoryPalaceRound[]>([]);
   const [flashIndex, setFlashIndex] = useState(0);
   const [flashStage, setFlashStage] = useState<"show" | "choose">("show");
   const [flashCountdown, setFlashCountdown] = useState(0);
@@ -220,6 +227,24 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       setFlashStage("show");
       setFlashCountdown(Math.ceil(wordMemoryDuration / 1000));
       setWordMemoryInputs(Array(rounds[0]?.words.length ?? 0).fill(""));
+    } else if (kind === "memory_palace") {
+      const locations = ["salon", "mutfak", "bahçe", "masa", "saat", "kitaplık"];
+      const sourceObjects = words.length ? words : DISTRACTORS.memory_palace;
+      const rounds = Array.from({ length: EXERCISE_ROUND_COUNT }, (_, index) => {
+        const location = locations[index % locations.length];
+        const object = sourceObjects[index % sourceObjects.length];
+        return {
+          object,
+          location,
+          choices: shuffled(locations),
+        };
+      });
+      setMemoryPalaceRounds(rounds);
+      setFlashRounds([]);
+      setFlashWordRounds([]);
+      setFlashIndex(0);
+      setFlashStage("show");
+      setFlashCountdown(5);
     } else if (FLASH_LIKE_KINDS.includes(kind)) {
       const sourceWords = words.length ? words : DISTRACTORS[kind];
       const rounds = Array.from({ length: EXERCISE_ROUND_COUNT }, () => {
@@ -236,8 +261,8 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   };
 
   useEffect(() => {
-    if (phase !== "playing" || !["flash_words", "word_memory"].includes(kind) || flashStage !== "show") return;
-    const displayDuration = kind === "word_memory" ? wordMemoryDuration : flashDuration;
+    if (phase !== "playing" || !["flash_words", "word_memory", "memory_palace"].includes(kind) || flashStage !== "show") return;
+    const displayDuration = kind === "word_memory" ? wordMemoryDuration : kind === "memory_palace" ? 5000 : flashDuration;
     setFlashCountdown(Math.ceil(displayDuration / 1000));
     const timer = window.setInterval(() => {
       setFlashCountdown((current) => {
@@ -326,6 +351,24 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     }
     setFlashIndex(next);
     setFlashStage("show");
+  };
+
+  const handleMemoryPalaceChoice = (choice: string) => {
+    if (phase !== "playing" || kind !== "memory_palace" || flashStage !== "choose") return;
+    if (choice === memoryPalaceRounds[flashIndex]?.location) {
+      correctRef.current += 1;
+      setCorrectAnswers(correctRef.current);
+    } else {
+      wrongRef.current += 1;
+    }
+    const next = flashIndex + 1;
+    if (next >= memoryPalaceRounds.length) {
+      finish(correctRef.current, wrongRef.current, memoryPalaceRounds.length);
+      return;
+    }
+    setFlashIndex(next);
+    setFlashStage("show");
+    setFlashCountdown(5);
   };
 
   const handleWordMemorySubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -481,6 +524,33 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
                 <p className="text-sm font-semibold text-charcoal">Az önceki listede hangisi yoktu?</p>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   {flashWordRounds[flashIndex].choices.map((choice) => <Button key={choice} variant="outline" onClick={() => handleFlashChoice(choice)}>{choice}</Button>)}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {phase === "playing" && kind === "memory_palace" && memoryPalaceRounds[flashIndex] && (
+          <div className="space-y-4 rounded-xl bg-ivory-warm p-6 text-center">
+            {flashStage === "show" ? (
+              <>
+                <p className="text-sm font-semibold text-charcoal">Bu nesneyi ve bulunduğu konumu hatırlayın:</p>
+                <div className="flex min-h-36 flex-col items-center justify-center rounded-xl border border-amber-200 bg-white">
+                  <span className="text-4xl">●</span>
+                  <strong className="mt-2 text-2xl text-brand-900">{memoryPalaceRounds[flashIndex].object}</strong>
+                </div>
+                <p className="text-sm text-charcoal-muted">Konum: <strong>{memoryPalaceRounds[flashIndex].location}</strong></p>
+                <span className="inline-block rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-sm font-bold tabular-nums text-amber-900" aria-live="polite">
+                  {flashCountdown} sn
+                </span>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-semibold text-charcoal">Bu nesne hangi konumdaydı?</p>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {memoryPalaceRounds[flashIndex].choices.map((choice) => (
+                    <Button key={choice} variant="outline" onClick={() => handleMemoryPalaceChoice(choice)}>{choice}</Button>
+                  ))}
                 </div>
               </>
             )}
