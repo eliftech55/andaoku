@@ -409,7 +409,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
 
   const title = activity.title;
   const instructions = kind === "eye_saccade"
-    ? "Sarı noktayı gözlerinizle bulun, o noktaya tıklayın ve bir sonraki sarı noktaya geçin. Noktalar rastgele sıradadır; başınızı sabit tutup yalnızca gözlerinizi hızlı ve kontrollü biçimde hareket ettirin."
+    ? "3×3 alanda her turda yalnızca sarı noktaya tıklayın. Sarı nokta her doğru tıklamadan sonra başka bir konuma geçer; beyaz noktalara tıklamayın."
     : activity.instructions;
   const progressCount = kind === "eye_saccade" ? sequenceIndex : FLASH_LIKE_KINDS.includes(kind) ? correctAnswers : selectedCells.length;
   const roundNumber = kind === "eye_saccade"
@@ -463,17 +463,21 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
               <p className="font-semibold">Nasıl yapılır?</p>
               <ol className="mt-1 list-inside list-decimal space-y-1">
-                <li>Sarı noktayı gözlerinizle bulun.</li>
-                <li>Bakışınızı sarı noktaya taşıdıktan sonra o noktaya tıklayın.</li>
-                <li>Yeni sarı nokta yanınca aynı işlemi tekrarlayın.</li>
+                <li>3×3 alanda sarı noktayı bulun.</li>
+                <li>Sarı noktaya tıklayın; beyaz noktalara tıklamayın.</li>
+                <li>Yeni sarı nokta başka bir yerde görünür. 5 tur tamamlanana kadar tekrarlayın.</li>
               </ol>
-              <p className="mt-2 text-xs">Başınızı sabit tutun; yalnızca gözlerinizi hızlı ve kontrollü hareket ettirin.</p>
+              <p className="mt-2 text-xs">Amaç, gözlerinizi farklı konumlara hızlıca taşıyıp doğru hedefi seçmektir. Başınızı sabit tutmaya çalışın.</p>
             </div>
             <div className="flex items-center justify-between text-sm text-charcoal-muted">
               <span>Hedef {sequenceIndex + 1}/{sequence.length}</span>
               <span>{sequenceIndex} doğru · {wrongRef.current} yanlış</span>
             </div>
             {saccadeError && <p role="alert" className="text-sm font-semibold text-rose-700">Bu nokta sıradaki hedef değil. Sarı noktaya tıklayın.</p>}
+            <div className="flex items-center justify-center gap-4 text-xs text-charcoal-muted">
+              <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded-full bg-amber-400" />Tıklanacak hedef</span>
+              <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded-full border border-sage-300 bg-white" />Tıklanmayacak alan</span>
+            </div>
             <div className="grid max-w-sm grid-cols-3 gap-3 mx-auto rounded-xl bg-ivory-warm p-4">
               {Array.from({ length: 9 }, (_, index) => (
                 <button key={index} type="button" aria-label={sequence[sequenceIndex] === index ? "Sıradaki sarı hedef" : `Bakış noktası ${index + 1}`} onClick={() => handleSaccadeClick(index)} className={`aspect-square rounded-full border-2 text-2xl transition-colors ${sequence[sequenceIndex] === index ? "border-amber-500 bg-amber-300 text-brand-900 shadow-md" : sequence.slice(0, sequenceIndex).includes(index) ? "border-emerald-400 bg-emerald-100 text-emerald-700" : "border-sage-200 bg-white text-transparent hover:border-amber-300"}`}>
