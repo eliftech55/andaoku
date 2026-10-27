@@ -195,7 +195,12 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     completed.current = false;
     correctRef.current = 0;
     wrongRef.current = 0;
-    totalRef.current = kind === "eye_saccade" ? sequenceLength : kind === "matching_cards" ? EXERCISE_ROUND_COUNT : targetCount;
+    totalRef.current =
+      kind === "eye_saccade"
+        ? sequenceLength
+        : ["matching_cards", "point_tracking"].includes(kind)
+          ? EXERCISE_ROUND_COUNT
+          : targetCount;
     setCorrectAnswers(0);
     setSummary(null);
     setSaveError(null);
@@ -315,6 +320,8 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       setSequenceMemoryStage("show");
       setSequenceMemoryVisibleCount(0);
       setFlashIndex(0);
+    } else if (kind === "point_tracking") {
+      setFlashIndex(0);
     } else if (FLASH_LIKE_KINDS.includes(kind)) {
       const sourceWords = words.length ? words : DISTRACTORS[kind];
       const rounds = Array.from({ length: EXERCISE_ROUND_COUNT }, () => {
@@ -413,7 +420,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   };
 
   const handleTrackingRoundComplete = () => {
-    if (phase !== "playing" || kind !== "infinity_tracking") return;
+    if (phase !== "playing" || !["infinity_tracking", "point_tracking"].includes(kind)) return;
     correctRef.current += 1;
     setCorrectAnswers(correctRef.current);
     const next = flashIndex + 1;
@@ -608,7 +615,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     ? Math.min(sequenceIndex + 1, sequenceLength)
     : kind === "matching_cards"
       ? Math.min(flashIndex + 1, EXERCISE_ROUND_COUNT)
-      : kind === "sequence_memory"
+      : kind === "sequence_memory" || kind === "point_tracking"
         ? Math.min(flashIndex + 1, EXERCISE_ROUND_COUNT)
     : FLASH_LIKE_KINDS.includes(kind)
       ? Math.min(flashIndex + 1, EXERCISE_ROUND_COUNT)
@@ -696,6 +703,41 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
                 <animateMotion dur="4s" repeatCount="indefinite" path="M180 90 C180 20 40 20 40 90 C40 160 180 160 180 90 C180 20 320 20 320 90 C320 160 180 160 180 90" />
               </circle>
             </svg>
+            <Button type="button" variant="primary" onClick={handleTrackingRoundComplete}>
+              Turu tamamladım
+            </Button>
+          </div>
+        )}
+
+        {phase === "playing" && kind === "point_tracking" && (
+          <div className="space-y-4 rounded-xl bg-ivory-warm p-6 text-center">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+              <p className="font-semibold">Nasıl yapılır?</p>
+              <p className="mt-1">
+                Merkezdeki hareketli noktayı yalnızca gözlerinizle takip edin. Nokta yön değiştirdiğinde
+                bakışınızı yumuşak biçimde yeni yöne taşıyın. Başınızı sabit tutun.
+              </p>
+            </div>
+            <svg viewBox="0 0 360 180" className="mx-auto h-52 w-full max-w-lg" role="img" aria-label="Yön değiştirerek hareket eden nokta">
+              <path
+                d="M40 90 C40 35 120 35 180 90 C240 145 320 145 320 90 C320 35 240 35 180 90 C120 145 40 145 40 90"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="6"
+                strokeDasharray="8 8"
+                className="text-brand-300"
+              />
+              <circle r="11" fill="currentColor" className="text-amber-500">
+                <animateMotion
+                  dur="3s"
+                  repeatCount="indefinite"
+                  path="M40 90 C40 35 120 35 180 90 C240 145 320 145 320 90 C320 35 240 35 180 90 C120 145 40 145 40 90"
+                />
+              </circle>
+            </svg>
+            <p className="text-sm text-charcoal-muted">
+              Noktanın yön değişimlerine odaklanın. Hazır olduğunuzda turu tamamlayın.
+            </p>
             <Button type="button" variant="primary" onClick={handleTrackingRoundComplete}>
               Turu tamamladım
             </Button>
