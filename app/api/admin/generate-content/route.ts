@@ -2,6 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
 import { countTurkishWords } from "@/lib/utils/readingMetrics";
 import { generatedContentSchema, generationInputSchema } from "@/lib/validation/generatedContent";
+import { adminAuth, adminDb } from "@/lib/firebase/admin";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -135,6 +136,18 @@ const generatedContentJsonSchema = {
 };
 
 async function verifyAdmin(idToken: string): Promise<boolean> {
+  if (adminAuth && adminDb) {
+    try {
+      const decodedToken = await adminAuth.verifyIdToken(idToken);
+      if (decodedToken.role === "admin") return true;
+
+      const profile = await adminDb.collection("users").doc(decodedToken.uid).get();
+      return profile.data()?.role === "admin";
+    } catch (error) {
+      console.warn("Firebase Admin doğrulaması başarısız, REST doğrulamasına geçiliyor:", error);
+    }
+  }
+
   const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
   const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
   if (!apiKey || !projectId) {
