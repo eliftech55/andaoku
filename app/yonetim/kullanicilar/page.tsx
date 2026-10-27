@@ -64,14 +64,26 @@ export default function KullaniciYonetimiPage() {
       try {
         const list = await getAllUserProfiles();
         const assignmentEntries = await Promise.all(
-          list.map(async (item) => [item.uid, await getUserAssignments(item.uid)] as const)
+          list.map(async (item) => {
+            try {
+              return [item.uid, await getUserAssignments(item.uid)] as const;
+            } catch (assignmentError) {
+              console.error(`Kullanıcı görevi yüklenemedi (${item.uid}):`, assignmentError);
+              return [item.uid, []] as const;
+            }
+          })
         );
         if (active) {
           setUsers(list.sort((left, right) => left.displayName.localeCompare(right.displayName, "tr")));
           setAssignments(Object.fromEntries(assignmentEntries));
         }
-      } catch {
-        if (active) setError("Kullanıcılar yüklenemedi. Firestore erişimini kontrol edin.");
+      } catch (loadError) {
+        console.error("Kullanıcılar yüklenemedi:", loadError);
+        if (active) {
+          setError(
+            "Kullanıcılar yüklenemedi. Yönetici yetkisini ve Firestore erişim kurallarını kontrol edin."
+          );
+        }
       } finally {
         if (active) setLoading(false);
       }
