@@ -17,6 +17,20 @@ const KIND_ORDER: ExerciseKind[] = [
   "target_scan",
   "eye_saccade",
   "flash_words",
+  "point_tracking",
+  "infinity_tracking",
+  "chunk_reading",
+  "pacer_reading",
+  "schulte_table",
+  "regression_prevention",
+  "digit_memory",
+  "word_memory",
+  "matching_cards",
+  "sequence_memory",
+  "passage_memory",
+  "memory_palace",
+  "n_back",
+  "visual_change",
 ];
 
 const EXERCISE_LEVELS = [1, 2, 3, 4, 5];
@@ -26,6 +40,20 @@ const KIND_LABELS: Record<ExerciseKind, string> = {
   target_scan: "Hedef ve Harf Tarama",
   eye_saccade: "Göz Sıçraması",
   flash_words: "Flaş Kelime Tanıma",
+  point_tracking: "Nokta Takibi",
+  infinity_tracking: "Sekiz Takibi",
+  chunk_reading: "Kelime Grubu Flaş",
+  pacer_reading: "Rehberli Satır Takibi",
+  schulte_table: "Schulte Tablosu",
+  regression_prevention: "Geri Dönüşü Engelleme",
+  digit_memory: "Rakam Dizisi Hafızası",
+  word_memory: "Kelime Listesi Hatırlama",
+  matching_cards: "Eşleştirme Kartları",
+  sequence_memory: "Görsel Sıra Hafızası",
+  passage_memory: "Metin Parçası Hatırlama",
+  memory_palace: "Hafıza Sarayı",
+  n_back: "Çift Görev Hafızası",
+  visual_change: "Neyin Değişti?",
 };
 
 function getInitialExerciseLevels(

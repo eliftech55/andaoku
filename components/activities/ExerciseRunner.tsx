@@ -29,11 +29,40 @@ const DISTRACTORS: Record<ExerciseKind, string[]> = {
   target_scan: ["R", "H", "K", "4", "Λ", "A"],
   eye_saccade: ["●"],
   flash_words: ["okuma", "dikkat", "bilgi", "anlam", "kitap", "öğrenme", "tarama", "odak"],
+  point_tracking: ["●"],
+  infinity_tracking: ["●"],
+  chunk_reading: ["hızlı okuma", "bilgi", "dikkatli düşünme", "anlam kurma", "göz hareketi"],
+  pacer_reading: ["Kısa metinleri düzenli hızda okuyun.", "Bakışınızı satır boyunca akıcı biçimde ilerletin.", "Anlamı koruyarak gereksiz duraklamaları azaltın."],
+  schulte_table: ["1", "2", "3", "4", "5", "6", "7", "8", "9"],
+  regression_prevention: ["okuma", "anlama", "odak", "metin", "ilerleme"],
+  digit_memory: ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
+  word_memory: ["kitap", "nehir", "merdiven", "ışık", "kalem", "orman", "soru", "yol"],
+  matching_cards: ["daire", "kare", "üçgen", "yıldız", "elma", "bulut"],
+  sequence_memory: ["kırmızı", "mavi", "yeşil", "sarı", "mor", "turuncu"],
+  passage_memory: ["bilim", "tarih", "doğa", "günlük yaşam", "keşif", "öğrenme"],
+  memory_palace: ["salon", "mutfak", "bahçe", "masa", "saat", "kitaplık"],
+  n_back: ["A", "B", "C", "D", "E", "F", "G", "H"],
+  visual_change: ["●", "■", "▲", "★", "◆", "⬟"],
 };
 
 function shuffled<T>(items: T[]): T[] {
   return [...items].sort(() => Math.random() - 0.5);
 }
+
+const FLASH_LIKE_KINDS: ExerciseKind[] = [
+  "flash_words",
+  "chunk_reading",
+  "pacer_reading",
+  "regression_prevention",
+  "digit_memory",
+  "word_memory",
+  "matching_cards",
+  "sequence_memory",
+  "passage_memory",
+  "memory_palace",
+  "n_back",
+  "visual_change",
+];
 
 export function ExerciseRunner({ activity, onComplete }: ExerciseRunnerProps) {
   const kind = activity.type as ExerciseKind;
@@ -48,7 +77,7 @@ export function ExerciseRunner({ activity, onComplete }: ExerciseRunnerProps) {
   const flashDuration = Math.min(3000, Math.max(200, activity.contentConfig.flashDurationMs || 1000));
   const words = activity.contentConfig.wordList?.length
     ? activity.contentConfig.wordList
-    : DISTRACTORS.flash_words;
+    : DISTRACTORS[kind];
 
   const [phase, setPhase] = useState<"idle" | "playing" | "finished">("idle");
   const [timeLeft, setTimeLeft] = useState(durationLimit);
@@ -122,10 +151,11 @@ export function ExerciseRunner({ activity, onComplete }: ExerciseRunnerProps) {
     } else if (kind === "eye_saccade") {
       setSequence(Array.from({ length: sequenceLength }, () => Math.floor(Math.random() * 9)));
       setSequenceIndex(0);
-    } else if (kind === "flash_words") {
+    } else if (FLASH_LIKE_KINDS.includes(kind)) {
+      const sourceWords = words.length ? words : DISTRACTORS[kind];
       const rounds = Array.from({ length: targetCount }, () => {
-        const word = words[Math.floor(Math.random() * words.length)];
-        const options = shuffled([word, ...shuffled(words.filter((item) => item !== word)).slice(0, 3)]);
+        const word = sourceWords[Math.floor(Math.random() * sourceWords.length)];
+        const options = shuffled([word, ...shuffled(sourceWords.filter((item) => item !== word)).slice(0, 3)]);
         return { word, choices: options };
       });
       setFlashRounds(rounds);
@@ -201,7 +231,7 @@ export function ExerciseRunner({ activity, onComplete }: ExerciseRunnerProps) {
   };
 
   const title = activity.title;
-  const progressCount = kind === "eye_saccade" ? sequenceIndex : kind === "flash_words" ? correctAnswers : selectedCells.length;
+  const progressCount = kind === "eye_saccade" ? sequenceIndex : FLASH_LIKE_KINDS.includes(kind) ? correctAnswers : selectedCells.length;
 
   return (
     <Card className="mx-auto max-w-2xl border-sage-200">
@@ -250,7 +280,7 @@ export function ExerciseRunner({ activity, onComplete }: ExerciseRunnerProps) {
           </div>
         )}
 
-        {phase === "playing" && kind === "flash_words" && flashRounds[flashIndex] && (
+        {phase === "playing" && FLASH_LIKE_KINDS.includes(kind) && flashRounds[flashIndex] && (
           <div className="space-y-4 rounded-xl bg-ivory-warm p-6 text-center">
             <p className="text-xs text-charcoal-muted">Kelime {flashIndex + 1}/{flashRounds.length}</p>
             {flashStage === "show" ? (

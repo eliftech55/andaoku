@@ -32,6 +32,20 @@ const EXERCISE_LABELS: Record<ExerciseKind, string> = {
   target_scan: "Hedef tarama",
   eye_saccade: "Göz sıçraması",
   flash_words: "Flaş kelime",
+  point_tracking: "Nokta takibi",
+  infinity_tracking: "Sekiz takibi",
+  chunk_reading: "Kelime grubu flaş",
+  pacer_reading: "Rehberli satır takibi",
+  schulte_table: "Schulte tablosu",
+  regression_prevention: "Geri dönüşü engelleme",
+  digit_memory: "Rakam dizisi hafızası",
+  word_memory: "Kelime listesi hatırlama",
+  matching_cards: "Eşleştirme kartları",
+  sequence_memory: "Görsel sıra hafızası",
+  passage_memory: "Metin parçası hatırlama",
+  memory_palace: "Hafıza sarayı",
+  n_back: "Çift görev hafızası",
+  visual_change: "Neyin değişti?",
 };
 
 export default function ModuleManagementPage() {

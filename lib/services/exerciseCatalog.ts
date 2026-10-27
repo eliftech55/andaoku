@@ -36,6 +36,90 @@ const EXERCISES: Record<
     instructions: "Kısa süre gösterilen kelimeyi aklınızda tutup seçenekler arasından seçin.",
     targetSymbol: "",
   },
+  point_tracking: {
+    title: "Nokta Takibi",
+    description: "Hareket eden noktayı başınızı oynatmadan gözlerinizle takip etme çalışması.",
+    instructions: "Merkezdeki noktayı yalnızca gözlerinizle takip edin ve yön değişimlerine odaklanın.",
+    targetSymbol: "●",
+  },
+  infinity_tracking: {
+    title: "Sekiz Takibi",
+    description: "Sonsuz işareti üzerinde hareket eden noktayı akıcı biçimde takip etme çalışması.",
+    instructions: "Hareket eden noktayı gözlerinizle izleyin; başınızı sabit tutun.",
+    targetSymbol: "●",
+  },
+  chunk_reading: {
+    title: "Kelime Grubu Flaş",
+    description: "Kelimeleri tek tek yerine anlamlı gruplar hâlinde algılama çalışması.",
+    instructions: "Kısa süre gösterilen kelime grubunu okuyup ardından anlamını hatırlayın.",
+    targetSymbol: "",
+  },
+  pacer_reading: {
+    title: "Rehberli Satır Takibi",
+    description: "Metin üzerinde düzenli hızda ilerleyen vurguyu takip etme çalışması.",
+    instructions: "Vurgulanan kelime veya kelime grubunu geriye dönmeden takip edin.",
+    targetSymbol: "",
+  },
+  schulte_table: {
+    title: "Schulte Tablosu",
+    description: "Sayıları sırayla bularak görsel tarama ve odaklanma çalışması.",
+    instructions: "Sayıları 1’den başlayarak mümkün olduğunca hızlı sırayla seçin.",
+    targetSymbol: "",
+  },
+  regression_prevention: {
+    title: "Geri Dönüşü Engelleme",
+    description: "Okuma sırasında geriye dönmeden ilerlemeyi destekleyen çalışma.",
+    instructions: "Vurguyu takip edin; geride kalan kelimeler silikleşirken metni ileri doğru okuyun.",
+    targetSymbol: "",
+  },
+  digit_memory: {
+    title: "Rakam Dizisi Hafızası",
+    description: "Rastgele sayı dizilerini kısa süreli bellekte tutma çalışması.",
+    instructions: "Görünen sayı dizisini kaybolduktan sonra doğru sırayla girin.",
+    targetSymbol: "",
+  },
+  word_memory: {
+    title: "Kelime Listesi Hatırlama",
+    description: "Farklı Türkçe kelimeleri kısa süreli bellekte tutma çalışması.",
+    instructions: "Gösterilen kelimeleri hatırlayıp giriş alanına virgülle ayırarak yazın.",
+    targetSymbol: "",
+  },
+  matching_cards: {
+    title: "Eşleştirme Kartları",
+    description: "Kart çiftlerini konumlarıyla hatırlama ve eşleştirme çalışması.",
+    instructions: "Kartları ikişer açın ve aynı çiftleri mümkün olduğunca az hamlede bulun.",
+    targetSymbol: "",
+  },
+  sequence_memory: {
+    title: "Görsel Sıra Hafızası",
+    description: "Işık dizilerini aynı sırayla tekrarlayarak çalışma belleğini geliştirme.",
+    instructions: "Yanan kutuları aynı sırayla seçin; her başarılı turda dizi uzar.",
+    targetSymbol: "",
+  },
+  passage_memory: {
+    title: "Metin Parçası Hatırlama",
+    description: "Farklı kısa metinleri okuyup ana bilgileri hatırlama çalışması.",
+    instructions: "Metni dikkatle okuyun; gizlendikten sonra soruları yanıtlayın.",
+    targetSymbol: "",
+  },
+  memory_palace: {
+    title: "Hafıza Sarayı",
+    description: "Kelimeleri ve nesneleri konumlarıyla ilişkilendirme çalışması.",
+    instructions: "Konumlarda görünen nesneleri hatırlayın ve sorulan konumla eşleştirin.",
+    targetSymbol: "",
+  },
+  n_back: {
+    title: "Çift Görev Hafızası",
+    description: "Güncel uyaranı önceki uyaranlarla karşılaştırarak çalışma belleğini geliştirme.",
+    instructions: "Konumun veya harfin N adım önceki uyaranla eşleşip eşleşmediğini seçin.",
+    targetSymbol: "",
+  },
+  visual_change: {
+    title: "Neyin Değişti?",
+    description: "Görsel düzen içindeki küçük değişiklikleri fark etme çalışması.",
+    instructions: "İki görsel arasındaki değişen nesneyi seçin.",
+    targetSymbol: "",
+  },
 };
 
 export const BUILT_IN_EXERCISE_DEFINITIONS: ExerciseDefinition[] = (
