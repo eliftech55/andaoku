@@ -27,7 +27,12 @@ import {
   EducationLevel,
   DifficultyLevel,
 } from "../types";
-import { getPublishedPlacementPackages } from "./placementExamService";
+import {
+  getAllPlacementExams,
+  getPublishedPlacementPackages,
+  getPlacementPassageById,
+  getStudentPlacementQuestions,
+} from "./placementExamService";
 
 export async function fetchAllModules(): Promise<LearningModule[]> {
   try {
@@ -114,6 +119,24 @@ export async function fetchPassageById(id: string): Promise<ReadingPassage | nul
     const p = await getPassageByIdFirestore(id);
     if (p) return p;
   } catch (e) {}
+
+  const placementPassage = await getPlacementPassageById(id);
+  if (placementPassage) {
+    return {
+      ...placementPassage,
+      genre:
+        placementPassage.genre === "bilgilendirici" ||
+        placementPassage.genre === "oykuleyici" ||
+        placementPassage.genre === "aciklayici" ||
+        placementPassage.genre === "akademik" ||
+        placementPassage.genre === "diger"
+          ? placementPassage.genre
+          : "diger",
+      targetSkills: [],
+      estimatedReadingTime: 0,
+    };
+  }
+
   return SEED_PASSAGES.find((p) => p.id === id) || null;
 }
 
@@ -142,5 +165,24 @@ export async function fetchQuestionsForPassage(passageId: string): Promise<Quest
     const list = await getQuestionsFirestore(passageId);
     if (list && list.length > 0) return list;
   } catch (e) {}
+
+  const exam = (await getAllPlacementExams()).find((item) => item.passageId === passageId);
+  if (exam) {
+    const placementQuestions = await getStudentPlacementQuestions(exam.code);
+    return placementQuestions.map((question) => ({
+      id: question.id,
+      passageId,
+      passageVersion: question.passageVersion,
+      questionType: "multiple_choice",
+      prompt: question.questionText,
+      options: question.options,
+      correctAnswer: "",
+      points: question.points,
+      explanation: question.explanation,
+      targetSkill: question.questionType,
+      status: question.status,
+    }));
+  }
+
   return SEED_QUESTIONS.filter((q) => q.passageId === passageId);
 }
