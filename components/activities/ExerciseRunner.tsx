@@ -152,6 +152,8 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   const correctRef = useRef(0);
   const wrongRef = useRef(0);
   const totalRef = useRef(0);
+  const matchingMatchesRef = useRef(0);
+  const matchingMovesRef = useRef(0);
   const completed = useRef(false);
 
   const finish = (correct: number, wrong: number, total: number) => {
@@ -159,7 +161,9 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     completed.current = true;
     setPhase("finished");
     const score = kind === "matching_cards"
-      ? Math.max(0, Math.round((correct / total) * 100) - wrong * 5)
+      ? matchingMovesRef.current > 0
+        ? Math.round((matchingMatchesRef.current / matchingMovesRef.current) * 200)
+        : 0
       : total + wrong > 0
         ? Math.round((correct / (total + wrong)) * 100)
         : 0;
@@ -195,6 +199,8 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     setMatchingBusy(false);
     setMatchingMoves(0);
     setMatchingPairs(0);
+    matchingMatchesRef.current = 0;
+    matchingMovesRef.current = 0;
     setTimeLeft(durationLimit);
     startedAt.current = Date.now();
 
@@ -427,6 +433,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     }
 
     setMatchingMoves((current) => current + 1);
+    matchingMovesRef.current += 1;
     const firstCard = revealedCards[matchingFirst];
     const isMatch = firstCard?.value === card.value;
     if (isMatch) {
@@ -438,6 +445,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       const nextPairs = matchingPairs + 1;
       setMatchingCards(matchedCards);
       setMatchingPairs(nextPairs);
+      matchingMatchesRef.current += 1;
       setMatchingFirst(null);
 
       if (nextPairs === matchingCards.length / 2) {
