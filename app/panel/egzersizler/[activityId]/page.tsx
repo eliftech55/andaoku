@@ -8,9 +8,9 @@ import { ExerciseRunner, ExerciseResult } from "@/components/activities/Exercise
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { getUserExerciseAttempts, saveExerciseAttempt } from "@/lib/firebase/firestore";
+import { getUserExerciseAttempts, getUserProgressList, saveExerciseAttempt } from "@/lib/firebase/firestore";
 import { fetchActivities, fetchActivityById, fetchAllModules } from "@/lib/services/contentService";
-import { isExerciseLevelUnlocked } from "@/lib/services/moduleScoring";
+import { isExerciseLevelUnlocked, isModuleUnlocked } from "@/lib/services/moduleScoring";
 import { Activity, ExerciseAttempt, ExerciseKind, LearningModule } from "@/lib/types";
 import { ArrowLeft, Lock } from "lucide-react";
 
@@ -57,10 +57,11 @@ export default function RunExercisePage() {
     let active = true;
     async function load() {
       try {
-        const [loadedActivity, modules, attemptList, allActivities] = await Promise.all([
+        const [loadedActivity, modules, attemptList, progressList, allActivities] = await Promise.all([
           fetchActivityById(params.activityId),
           fetchAllModules(),
           getUserExerciseAttempts(userId),
+          getUserProgressList(userId),
           fetchActivities(),
         ]);
         if (!active) return;
@@ -76,6 +77,10 @@ export default function RunExercisePage() {
           (!assignedLevels || assignedLevels.includes(loadedActivity.level || 0));
         if (!assignedModule || !isAssigned) {
           setError("Bu egzersiz seviyesi şu anda öğrenci modülüne atanmamış.");
+          return;
+        }
+        if (!isModuleUnlocked(assignedModule, modules, progressList)) {
+          setError("Bu modülü açmak için önceki modülü gereken puanla tamamlamalısınız.");
           return;
         }
         setActivity(loadedActivity);

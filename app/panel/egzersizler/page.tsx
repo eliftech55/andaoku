@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getUserExerciseAttempts, getUserProgressList } from "@/lib/firebase/firestore";
 import { fetchActivities, fetchAllModules } from "@/lib/services/contentService";
-import { isExerciseLevelUnlocked } from "@/lib/services/moduleScoring";
+import { isExerciseLevelUnlocked, isModuleUnlocked } from "@/lib/services/moduleScoring";
 import { ExerciseAttempt, ExerciseKind, Activity, LearningModule, UserProgress } from "@/lib/types";
 import { BookOpen, CheckCircle2, Eye, Lock, Play } from "lucide-react";
 
@@ -100,6 +100,7 @@ export default function StudentExercisesPage() {
       {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">{error}</p>}
       {modules.length === 0 && !error && <Card><CardContent className="p-6 text-sm text-charcoal-muted">Henüz yayımlanmış modül bulunmuyor.</CardContent></Card>}
       {modules.map((module) => {
+        const moduleUnlocked = isModuleUnlocked(module, modules, progress);
         const exerciseKinds = module.exerciseTypes || [];
         const assignedLevels = module.exerciseLevels || {};
         const moduleActivities = activities
@@ -124,7 +125,12 @@ export default function StudentExercisesPage() {
               <p className="text-sm text-charcoal-muted">Okuma: {moduleProgress?.readingScore === undefined ? "bekleniyor" : `%${moduleProgress.readingScore}`} · Egzersiz: {moduleProgress?.exerciseScore === undefined ? "bekleniyor" : `%${moduleProgress.exerciseScore}`}</p>
             </CardHeader>
             <CardContent className="space-y-5">
-              {module.readingPassageId && (
+              {!moduleUnlocked && (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                  Bu modülü açmak için önceki modülü en az %{module.requiredCompletionScore ?? 70} puanla tamamlamalısınız.
+                </p>
+              )}
+              {module.readingPassageId && moduleUnlocked && (
                 <Link href={`/panel/okuma-laboratuvari?moduleId=${encodeURIComponent(module.id)}&passageId=${encodeURIComponent(module.readingPassageId)}`}>
                   <Button size="sm" variant="outline"><BookOpen className="mr-2 h-4 w-4" />Modül okuma metnini çalış</Button>
                 </Link>
@@ -150,7 +156,7 @@ export default function StudentExercisesPage() {
                       <div className="grid gap-2 sm:grid-cols-5">
                         {levels.map((activity) => {
                           const score = bestScore(activity);
-                          const unlocked = previousPassed(activity.level || 1);
+                          const unlocked = moduleUnlocked && previousPassed(activity.level || 1);
                           const latest = activityAttempts(activity)[0];
                           return (
                             <Link

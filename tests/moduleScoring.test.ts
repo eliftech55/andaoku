@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { calculateModuleScore, isExerciseLevelUnlocked } from "../lib/services/moduleScoring";
-import { ExerciseKind } from "../lib/types";
+import { calculateModuleScore, isExerciseLevelUnlocked, isModuleUnlocked } from "../lib/services/moduleScoring";
+import { ExerciseKind, LearningModule, UserProgress } from "../lib/types";
 
 const exerciseTypes: ExerciseKind[] = ["peripheral_vision", "target_scan"];
 
@@ -81,5 +81,63 @@ describe("exercise level unlocking", () => {
   it("unlocks the next level only after a previous best score of at least 70", () => {
     expect(isExerciseLevelUnlocked(2, 69)).toBe(false);
     expect(isExerciseLevelUnlocked(2, 70)).toBe(true);
+  });
+});
+
+describe("module unlocking", () => {
+  const prerequisite: LearningModule = {
+    id: "module-1",
+    title: "Modül 1",
+    description: "",
+    targetSkills: [],
+    difficulty: "easy",
+    exerciseTypes: exerciseTypes,
+    prerequisites: [],
+    requiredCompletionScore: 70,
+    order: 1,
+    estimatedDuration: 10,
+    status: "published",
+    createdBy: "test",
+    createdAt: "",
+    updatedAt: "",
+  };
+  const lockedModule: LearningModule = {
+    ...prerequisite,
+    id: "module-2",
+    title: "Modül 2",
+    prerequisites: ["module-1"],
+    order: 2,
+  };
+
+  it("keeps a module locked below its prerequisite score", () => {
+    const progress: UserProgress[] = [{
+      id: "progress-1",
+      userId: "user-1",
+      moduleId: "module-1",
+      status: "completed",
+      overallScore: 65,
+      completionPercentage: 65,
+      attemptCount: 1,
+      lastActivityAt: "",
+      updatedAt: "",
+    }];
+
+    expect(isModuleUnlocked(lockedModule, [prerequisite, lockedModule], progress)).toBe(false);
+  });
+
+  it("unlocks a module when its prerequisite meets the threshold", () => {
+    const progress: UserProgress[] = [{
+      id: "progress-1",
+      userId: "user-1",
+      moduleId: "module-1",
+      status: "completed",
+      overallScore: 70,
+      completionPercentage: 70,
+      attemptCount: 1,
+      lastActivityAt: "",
+      updatedAt: "",
+    }];
+
+    expect(isModuleUnlocked(lockedModule, [prerequisite, lockedModule], progress)).toBe(true);
   });
 });

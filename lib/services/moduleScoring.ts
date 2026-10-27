@@ -1,4 +1,4 @@
-import { ExerciseKind } from "@/lib/types";
+import { ExerciseKind, LearningModule, UserProgress } from "@/lib/types";
 
 interface ModuleScoreInput {
   readingScore?: number;
@@ -44,4 +44,20 @@ export function calculateModuleScore({
 
 export function isExerciseLevelUnlocked(level: number, previousLevelBestScore = 0): boolean {
   return level <= 1 || previousLevelBestScore >= 70;
+}
+
+export function isModuleUnlocked(
+  module: LearningModule,
+  modules: LearningModule[],
+  progress: UserProgress[]
+): boolean {
+  return !module.prerequisites?.length || module.prerequisites.every((prerequisiteId) => {
+    const prerequisiteModule = modules.find((candidate) => candidate.id === prerequisiteId);
+    const prerequisiteProgress = progress.find((item) => item.moduleId === prerequisiteId);
+    return Boolean(
+      prerequisiteModule &&
+      prerequisiteProgress?.status === "completed" &&
+      (prerequisiteProgress.overallScore ?? 0) >= (prerequisiteModule.requiredCompletionScore ?? 70)
+    );
+  });
 }
