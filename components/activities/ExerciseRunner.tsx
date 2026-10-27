@@ -83,6 +83,7 @@ const FLASH_LIKE_KINDS: ExerciseKind[] = [
 const FLASH_WORD_DURATIONS = [6000, 6000, 5000, 5000, 4000];
 const FLASH_WORD_COUNTS = [3, 4, 3, 4, 3];
 const WORD_MEMORY_DURATIONS = [10000, 10000, 9000, 8500, 8000];
+const WORD_MEMORY_COUNTS = [4, 5, 6, 7, 8];
 
 export function ExerciseRunner({ activity, onComplete, nextActivityHref }: ExerciseRunnerProps) {
   const kind = activity.type as ExerciseKind;
@@ -205,8 +206,10 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       setFlashCountdown(Math.ceil(flashDuration / 1000));
     } else if (kind === "word_memory") {
       const sourceWords = words.length ? words : DISTRACTORS.word_memory;
+      const levelIndex = Math.min(5, Math.max(1, activity.level || 1)) - 1;
+      const wordCount = WORD_MEMORY_COUNTS[levelIndex];
       const rounds = Array.from({ length: targetCount }, () => ({
-        words: shuffled(sourceWords).slice(0, sequenceLength),
+        words: shuffled(sourceWords).slice(0, wordCount),
       }));
       setWordMemoryRounds(rounds);
       setFlashRounds([]);
