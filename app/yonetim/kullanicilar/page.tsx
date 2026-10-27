@@ -25,9 +25,11 @@ const statusLabels: Record<UserProfile["status"], string> = {
 };
 
 const roleOptions: { value: UserRole; label: string }[] = [
-  { value: "admin", label: "Owner" },
-  { value: "learner", label: "Learner" },
-  { value: "teacher", label: "Teacher" },
+  { value: "learner", label: "Öğrenci / Okur" },
+  { value: "teacher", label: "Öğretmen" },
+  { value: "content_manager", label: "İçerik Yöneticisi" },
+  { value: "admin", label: "Yönetici" },
+  { value: "researcher", label: "Araştırmacı" },
 ];
 
 export default function KullaniciYonetimiPage() {
@@ -97,7 +99,7 @@ export default function KullaniciYonetimiPage() {
   const openEditor = (target: UserProfile) => {
     const assignment = assignments[target.uid]?.find((item) => item.status === "active") || null;
     setEditingUser(target);
-    setRole(target.role === "admin" ? "admin" : target.role === "teacher" ? "teacher" : "learner");
+    setRole(target.role);
     setEditingAssignment(assignment);
     setTaskTitle(assignment?.title || "");
     setDueAt(assignment?.dueAt ? assignment.dueAt.slice(0, 10) : "");
