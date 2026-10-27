@@ -457,6 +457,9 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
                     <div key={word} className="rounded-lg border border-amber-200 bg-white px-3 py-3 text-lg font-bold text-brand-900">{word}</div>
                   ))}
                 </div>
+                <Button type="button" variant="primary" onClick={() => setFlashStage("choose")}>
+                  Devam et
+                </Button>
               </>
             ) : (
               <form className="space-y-3 text-left" onSubmit={handleWordMemorySubmit}>
