@@ -197,8 +197,8 @@ export function ReadingLab({
     setResults(calculated);
     setReadingState("result");
 
-    if (persistResults) {
-      const currentUserId = user?.uid || profile?.uid || "misafir-okur";
+    const currentUserId = user?.uid || profile?.uid;
+    if (persistResults && currentUserId) {
       try {
         await saveReadingSession({
           userId: currentUserId,
@@ -233,9 +233,16 @@ export function ReadingLab({
           });
         }
 
-        await saveModuleReadingScore(currentUserId, moduleId || "modul-1", comprehensionScore);
       } catch (e) {
-        console.warn("Sonuçlar Firestore'a kaydedilirken not:", e);
+        console.warn("Okuma sonuçları Firestore'a kaydedilirken not:", e);
+      }
+    }
+
+    if (moduleId && currentUserId) {
+      try {
+        await saveModuleReadingScore(currentUserId, moduleId, comprehensionScore);
+      } catch (e) {
+        console.warn("Modül okuma puanı kaydedilirken not:", e);
       }
     }
 

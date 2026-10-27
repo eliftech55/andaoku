@@ -11,15 +11,17 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { BookOpen, Target, Sparkles, Layers, RefreshCw } from "lucide-react";
+import { BookOpen, Target, Sparkles, Layers, RefreshCw, Lock, CheckCircle2 } from "lucide-react";
 import {
   fetchActivities,
   fetchExerciseContent,
   fetchPassageById,
   fetchQuestionsForPassage,
+  fetchAllModules,
 } from "@/lib/services/contentService";
+import { getUserProgressList } from "@/lib/firebase/firestore";
 import { useAuth } from "@/contexts/AuthContext";
-import { Activity, ReadingPassage, Question } from "@/lib/types";
+import { Activity, LearningModule, ReadingPassage, Question, UserProgress } from "@/lib/types";
 
 interface LabHistoryEntry {
   passageId: string;
@@ -60,6 +62,8 @@ function OkumaLaboratuvariContent() {
   const [selectedEyeExercise, setSelectedEyeExercise] =
     useState<"matrix" | EyeMovementExerciseType>("matrix");
   const [requestedModuleId, setRequestedModuleId] = useState<string | null>(null);
+  const [selectedModule, setSelectedModule] = useState<LearningModule | null>(null);
+  const [moduleProgress, setModuleProgress] = useState<UserProgress | null>(null);
   const [loading, setLoading] = useState(true);
   const [labHistory, setLabHistory] = useState<LabHistoryEntry[]>([]);
 
@@ -77,8 +81,18 @@ function OkumaLaboratuvariContent() {
         const activityId = searchParams.get("activityId");
         if (active) setRequestedModuleId(moduleId);
         const activityList = moduleId ? await fetchActivities(moduleId) : [];
+        const moduleList = moduleId ? await fetchAllModules() : [];
+        const module = moduleList.find((item) => item.id === moduleId) || null;
+        const currentUserId = user?.uid || profile?.uid;
+        const progressList = moduleId && currentUserId
+          ? await getUserProgressList(currentUserId)
+          : [];
         const activity = activityList.find((item) => item.id === activityId) || null;
         if (active) setSelectedActivity(activity);
+        if (active) {
+          setSelectedModule(module);
+          setModuleProgress(progressList.find((item) => item.moduleId === moduleId) || null);
+        }
 
         const exerciseList = await fetchExerciseContent();
         const list = exerciseList.map((content) => content.passage);
@@ -147,7 +161,25 @@ function OkumaLaboratuvariContent() {
     comprehensionScore: number;
     durationSeconds: number;
   }) => {
-    if (!selectedPassage || searchParams.get("moduleId") || searchParams.get("activityId")) return;
+    if (requestedModuleId) {
+      const currentUserId = user?.uid || profile?.uid || "";
+      setModuleProgress((current) => ({
+        ...(current || {
+          id: `${currentUserId}_${requestedModuleId}`,
+          userId: currentUserId,
+          moduleId: requestedModuleId,
+          status: "in_progress",
+          completionPercentage: 0,
+          attemptCount: 0,
+          lastActivityAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }),
+        readingScore: Math.max(current?.readingScore || 0, result.comprehensionScore),
+        lastActivityAt: new Date().toISOString(),
+      }));
+      return;
+    }
+    if (!selectedPassage || searchParams.get("activityId")) return;
     const nextEntry = {
       passageId: selectedPassage.id,
       comprehensionScore: result.comprehensionScore,
@@ -186,6 +218,35 @@ function OkumaLaboratuvariContent() {
             Standart, blok veya RSVP okuma tekniklerini uygulayın; anlama derinliğini ve hızınızı test edin.
           </p>
         </div>
+
+        {selectedModule && (
+          <Card className="border-amber-200 bg-amber-50/60">
+            <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
+              <div>
+                <Badge variant="amber" className="mb-2">Modül Çalışması</Badge>
+                <h2 className="text-xl font-bold font-serif text-charcoal">{selectedModule.title}</h2>
+                <p className="mt-1 text-sm text-charcoal-muted">
+                  Modülü tamamlamak için gereken puan: <strong>%{selectedModule.requiredCompletionScore || 70}</strong>
+                </p>
+              </div>
+              <div className="text-right">
+                {moduleProgress?.status === "completed" ? (
+                  <p className="flex items-center gap-1.5 text-sm font-bold text-emerald-700">
+                    <CheckCircle2 className="h-4 w-4" /> Modül tamamlandı
+                  </p>
+                ) : (
+                  <p className="flex items-center gap-1.5 text-sm font-bold text-brand-900">
+                    {moduleProgress ? <Target className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+                    Alınan okuma puanı: %{moduleProgress?.readingScore || 0}
+                  </p>
+                )}
+                <p className="mt-1 text-xs text-charcoal-muted">
+                  Genel modül puanı: %{moduleProgress?.overallScore || 0}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Sekmeler */}
         <div className="bg-sage-100 p-1.5 rounded-2xl flex gap-1 self-start sm:self-auto">
