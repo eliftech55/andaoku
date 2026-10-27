@@ -42,6 +42,13 @@ interface MemoryPalaceRound {
   choices: string[];
 }
 
+interface MatchingCard {
+  id: number;
+  value: string;
+  flipped: boolean;
+  matched: boolean;
+}
+
 const DISTRACTORS: Record<ExerciseKind, string[]> = {
   peripheral_vision: ["▲", "■", "◆", "✦", "●", "○"],
   target_scan: ["R", "H", "K", "4", "Λ", "A"],
@@ -126,6 +133,11 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   const [flashWordRounds, setFlashWordRounds] = useState<FlashWordRound[]>([]);
   const [wordMemoryRounds, setWordMemoryRounds] = useState<WordMemoryRound[]>([]);
   const [memoryPalaceRounds, setMemoryPalaceRounds] = useState<MemoryPalaceRound[]>([]);
+  const [matchingCards, setMatchingCards] = useState<MatchingCard[]>([]);
+  const [matchingFirst, setMatchingFirst] = useState<number | null>(null);
+  const [matchingBusy, setMatchingBusy] = useState(false);
+  const [matchingMoves, setMatchingMoves] = useState(0);
+  const [matchingPairs, setMatchingPairs] = useState(0);
   const [flashIndex, setFlashIndex] = useState(0);
   const [flashStage, setFlashStage] = useState<"show" | "choose">("show");
   const [flashCountdown, setFlashCountdown] = useState(0);
@@ -163,7 +175,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     completed.current = false;
     correctRef.current = 0;
     wrongRef.current = 0;
-    totalRef.current = kind === "eye_saccade" ? sequenceLength : targetCount;
+    totalRef.current = kind === "eye_saccade" ? sequenceLength : kind === "matching_cards" ? 0 : targetCount;
     setCorrectAnswers(0);
     setSummary(null);
     setSaveError(null);
@@ -171,6 +183,11 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     setSaccadeError(false);
     setWordMemoryInputs([]);
     setFlashIndex(0);
+    setMatchingCards([]);
+    setMatchingFirst(null);
+    setMatchingBusy(false);
+    setMatchingMoves(0);
+    setMatchingPairs(0);
     setTimeLeft(durationLimit);
     startedAt.current = Date.now();
 
@@ -246,6 +263,22 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       setFlashIndex(0);
       setFlashStage("show");
       setFlashCountdown(5);
+    } else if (kind === "matching_cards") {
+      const levelIndex = Math.min(5, Math.max(1, activity.level || 1)) - 1;
+      const pairCount = Math.min(6, 3 + levelIndex);
+      const sourceValues = Array.from(new Set([
+        ...(words.length ? words : DISTRACTORS.matching_cards),
+        "güneş", "ay", "çiçek", "ev",
+      ])).slice(0, pairCount);
+      const cards = shuffled(sourceValues.flatMap((value, pairIndex) => [
+        { id: pairIndex * 2, value, flipped: false, matched: false },
+        { id: pairIndex * 2 + 1, value, flipped: false, matched: false },
+      ]));
+      setMatchingCards(cards);
+      setMatchingFirst(null);
+      setMatchingMoves(0);
+      setMatchingPairs(0);
+      totalRef.current = pairCount * EXERCISE_ROUND_COUNT;
     } else if (FLASH_LIKE_KINDS.includes(kind)) {
       const sourceWords = words.length ? words : DISTRACTORS[kind];
       const rounds = Array.from({ length: EXERCISE_ROUND_COUNT }, () => {
@@ -372,6 +405,69 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     setFlashCountdown(5);
   };
 
+  const handleMatchingCardClick = (index: number) => {
+    if (phase !== "playing" || kind !== "matching_cards" || matchingBusy) return;
+    const card = matchingCards[index];
+    if (!card || card.flipped || card.matched) return;
+
+    const revealedCards = matchingCards.map((item, cardIndex) =>
+      cardIndex === index ? { ...item, flipped: true } : item
+    );
+    setMatchingCards(revealedCards);
+
+    if (matchingFirst === null) {
+      setMatchingFirst(index);
+      return;
+    }
+
+    setMatchingMoves((current) => current + 1);
+    const firstCard = revealedCards[matchingFirst];
+    const isMatch = firstCard?.value === card.value;
+    if (isMatch) {
+      const matchedCards = revealedCards.map((item, cardIndex) =>
+        cardIndex === matchingFirst || cardIndex === index
+          ? { ...item, matched: true }
+          : item
+      );
+      const nextPairs = matchingPairs + 1;
+      setMatchingCards(matchedCards);
+      setMatchingPairs(nextPairs);
+      correctRef.current += 1;
+      setCorrectAnswers(correctRef.current);
+      setMatchingFirst(null);
+
+      if (nextPairs === matchingCards.length / 2) {
+        const nextRound = flashIndex + 1;
+        if (nextRound >= EXERCISE_ROUND_COUNT) {
+          finish(correctRef.current, wrongRef.current, totalRef.current);
+          return;
+        }
+        setFlashIndex(nextRound);
+        window.setTimeout(() => {
+          const pairCount = matchingCards.length / 2;
+          const values = shuffled(Array.from(new Set(matchingCards.map((item) => item.value))));
+          setMatchingCards(shuffled(values.flatMap((value, pairIndex) => [
+            { id: pairIndex * 2, value, flipped: false, matched: false },
+            { id: pairIndex * 2 + 1, value, flipped: false, matched: false },
+          ])));
+          setMatchingPairs(0);
+          setMatchingMoves(0);
+        }, 500);
+      }
+      return;
+    }
+
+    wrongRef.current += 1;
+    setMatchingBusy(true);
+    window.setTimeout(() => {
+      setMatchingCards((current) => current.map((item, cardIndex) =>
+        cardIndex === matchingFirst || cardIndex === index ? { ...item, flipped: false } : item
+      ));
+      setMatchingFirst(null);
+      setMatchingBusy(false);
+    }, 700);
+  };
+
   const handleWordMemorySubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (phase !== "playing" || kind !== "word_memory" || flashStage !== "choose") return;
@@ -415,6 +511,8 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   const progressCount = kind === "eye_saccade" ? sequenceIndex : FLASH_LIKE_KINDS.includes(kind) ? correctAnswers : selectedCells.length;
   const roundNumber = kind === "eye_saccade"
     ? Math.min(sequenceIndex + 1, sequenceLength)
+    : kind === "matching_cards"
+      ? Math.min(flashIndex + 1, EXERCISE_ROUND_COUNT)
     : FLASH_LIKE_KINDS.includes(kind)
       ? Math.min(flashIndex + 1, EXERCISE_ROUND_COUNT)
       : Math.min(selectedCells.length + 1, EXERCISE_ROUND_COUNT);
@@ -615,7 +713,38 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
           </div>
         )}
 
-        {phase === "playing" && kind !== "flash_words" && kind !== "word_memory" && FLASH_LIKE_KINDS.includes(kind) && flashRounds[flashIndex] && (
+        {phase === "playing" && kind === "matching_cards" && matchingCards.length > 0 && (
+          <div className="space-y-4 rounded-xl bg-ivory-warm p-6 text-center">
+            <div className="flex items-center justify-between text-sm text-charcoal-muted">
+              <span>Aynı çiftleri bulun: {matchingPairs}/{matchingCards.length / 2}</span>
+              <span>Hamle: {matchingMoves}</span>
+            </div>
+            <p className="text-sm font-semibold text-charcoal">
+              Kartları ikişer açın. Aynı sembol veya kelimeyi bulduğunuzda çift eşleşir.
+            </p>
+            <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+              {matchingCards.map((card, index) => (
+                <button
+                  key={card.id}
+                  type="button"
+                  aria-label={card.flipped || card.matched ? `Kart ${card.value}` : `Kapalı kart ${index + 1}`}
+                  onClick={() => handleMatchingCardClick(index)}
+                  className={`aspect-square rounded-xl border-2 p-2 text-sm font-bold transition-all ${
+                    card.matched
+                      ? "border-emerald-400 bg-emerald-100 text-emerald-800"
+                      : card.flipped
+                        ? "border-amber-400 bg-amber-100 text-brand-900"
+                        : "border-sage-200 bg-white text-transparent hover:border-amber-300"
+                  }`}
+                >
+                  {card.flipped || card.matched ? card.value : "?"}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {phase === "playing" && kind !== "matching_cards" && kind !== "flash_words" && kind !== "word_memory" && FLASH_LIKE_KINDS.includes(kind) && flashRounds[flashIndex] && (
           <div className="space-y-4 rounded-xl bg-ivory-warm p-6 text-center">
             {flashStage === "show" ? (
               <div aria-live="polite" className="flex min-h-36 items-center justify-center text-3xl font-extrabold text-brand-900">{flashRounds[flashIndex].word}</div>
