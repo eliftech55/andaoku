@@ -644,6 +644,9 @@ export function ReadingLab({
             <p className="text-xs sm:text-sm text-sage-200 max-w-md mx-auto">
               Ölçümler bilimsel standartlarda WPM ve anlama yüzdesi olarak ayrı ayrı hesaplanmıştır.
             </p>
+            <p className="text-sm sm:text-base font-semibold text-white max-w-lg mx-auto">
+              Dakikada {results.wpm} kelime okudunuz ve anlama düzeyiniz %{results.comprehensionScore} olarak ölçüldü.
+            </p>
           </div>
 
           <CardContent className="p-6 sm:p-8 space-y-6">
@@ -652,7 +655,7 @@ export function ReadingLab({
               <div className="p-5 rounded-2xl bg-ivory-warm border border-sage-200 text-center space-y-1">
                 <div className="flex items-center justify-center gap-1.5 text-xs text-charcoal-muted font-medium">
                   <Gauge className="h-4 w-4 text-brand-700" />
-                  <span>Okuma Hızı</span>
+                  <span>Dakikada Okunan Kelime</span>
                 </div>
                 <div className="text-3xl sm:text-4xl font-extrabold font-mono text-brand-950">
                   {results.wpm} <span className="text-sm font-sans font-normal text-charcoal-muted">WPM</span>
@@ -663,7 +666,7 @@ export function ReadingLab({
               <div className="p-5 rounded-2xl bg-ivory-warm border border-sage-200 text-center space-y-1">
                 <div className="flex items-center justify-center gap-1.5 text-xs text-charcoal-muted font-medium">
                   <Sparkles className="h-4 w-4 text-amber-600" />
-                  <span>Okuduğunu Anlama</span>
+                  <span>Anlama Yüzdesi</span>
                 </div>
                 <div className="text-3xl sm:text-4xl font-extrabold font-mono text-amber-700">
                   %{results.comprehensionScore}
