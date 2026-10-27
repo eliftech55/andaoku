@@ -82,6 +82,7 @@ const FLASH_LIKE_KINDS: ExerciseKind[] = [
 
 const FLASH_WORD_DURATIONS = [6000, 6000, 5000, 5000, 4000];
 const FLASH_WORD_COUNTS = [3, 4, 3, 4, 3];
+const WORD_MEMORY_DURATIONS = [8000, 7500, 7000, 6500, 6000];
 
 export function ExerciseRunner({ activity, onComplete, nextActivityHref }: ExerciseRunnerProps) {
   const kind = activity.type as ExerciseKind;
@@ -96,6 +97,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   const flashDuration = kind === "flash_words"
     ? FLASH_WORD_DURATIONS[Math.min(5, Math.max(1, activity.level || 1)) - 1]
     : Math.min(3000, Math.max(200, activity.contentConfig.flashDurationMs || 1000));
+  const wordMemoryDuration = WORD_MEMORY_DURATIONS[Math.min(5, Math.max(1, activity.level || 1)) - 1];
   const words = activity.contentConfig.wordList?.length
     ? activity.contentConfig.wordList
     : DISTRACTORS[kind];
@@ -210,7 +212,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       setFlashWordRounds([]);
       setFlashIndex(0);
       setFlashStage("show");
-      setFlashCountdown(Math.ceil(flashDuration / 1000));
+      setFlashCountdown(Math.ceil(wordMemoryDuration / 1000));
     } else if (FLASH_LIKE_KINDS.includes(kind)) {
       const sourceWords = words.length ? words : DISTRACTORS[kind];
       const rounds = Array.from({ length: targetCount }, () => {
@@ -228,7 +230,8 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
 
   useEffect(() => {
     if (phase !== "playing" || !["flash_words", "word_memory"].includes(kind) || flashStage !== "show") return;
-    setFlashCountdown(Math.ceil(flashDuration / 1000));
+    const displayDuration = kind === "word_memory" ? wordMemoryDuration : flashDuration;
+    setFlashCountdown(Math.ceil(displayDuration / 1000));
     const timer = window.setInterval(() => {
       setFlashCountdown((current) => {
         if (current <= 1) {
@@ -240,7 +243,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       });
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [flashDuration, flashIndex, flashStage, kind, phase]);
+  }, [flashDuration, flashIndex, flashStage, kind, phase, wordMemoryDuration]);
 
   useEffect(() => {
     if (phase !== "playing" || timeLeft <= 0) return;
@@ -332,7 +335,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     }
     setFlashIndex(next);
     setFlashStage("show");
-    setFlashCountdown(Math.ceil(flashDuration / 1000));
+    setFlashCountdown(Math.ceil(wordMemoryDuration / 1000));
     setWordMemoryInput("");
     setWordMemoryError("");
   };
