@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { fetchActivities, fetchAllModules, fetchPassages } from "@/lib/services/contentService";
 import { getUserProgressList } from "@/lib/firebase/firestore";
+import { isModuleUnlocked } from "@/lib/services/moduleScoring";
 import type { Activity as LearningActivity, ExerciseKind, LearningModule, ReadingPassage, UserProgress } from "@/lib/types";
 
 const EXERCISE_LABELS: Record<ExerciseKind, string> = {
@@ -83,10 +84,7 @@ export default function OgrenmeYoluPage() {
     modules
       .filter((module) => {
         const progress = progressList.find((item) => item.moduleId === module.id);
-        return (
-          progress?.status === "completed" &&
-          (progress.overallScore ?? 0) >= (module.requiredCompletionScore ?? 70)
-        );
+        return (progress?.overallScore ?? 0) >= (module.requiredCompletionScore ?? 70);
       })
       .map((module) => module.id)
   );
@@ -160,9 +158,7 @@ export default function OgrenmeYoluPage() {
       <div className="space-y-6 relative before:absolute before:inset-0 before:left-7 before:w-1 before:bg-sage-200 before:hidden sm:before:block">
         {modules.map((mod) => {
           const isCompleted = completedModuleIds.has(mod.id);
-          const isUnlocked =
-            mod.prerequisites.length === 0 ||
-            mod.prerequisites.every((prereq) => completedModuleIds.has(prereq));
+          const isUnlocked = isModuleUnlocked(mod, modules, progressList);
 
           const Icon = getModuleIcon(mod.order);
           const moduleActivities = activities.filter(

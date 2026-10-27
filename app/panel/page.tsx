@@ -28,6 +28,7 @@ import { generateLearningRecommendation } from "@/lib/services/recommendationEng
 import { fetchAllModules, fetchActivities } from "@/lib/services/contentService";
 import { ProgressCharts } from "@/components/charts/ProgressCharts";
 import { formatDuration } from "@/lib/utils";
+import { isModuleUnlocked } from "@/lib/services/moduleScoring";
 
 export default function UserDashboardPage() {
   const { user, profile } = useAuth();
@@ -105,7 +106,10 @@ export default function UserDashboardPage() {
     : null;
   const latestComprehensionScore = latestReadingSession?.comprehensionScore
     ?? latestResult?.comprehensionScore;
-  const completedModulesCount = progressList.filter((p) => p.status === "completed").length;
+  const completedModulesCount = modules.filter((module) => {
+    const progress = progressList.find((item) => item.moduleId === module.id);
+    return (progress?.overallScore ?? 0) >= (module.requiredCompletionScore ?? 70);
+  }).length;
   const totalActivitiesCount = readingSessions.length;
   const displayName =
     profile?.displayName?.trim() ||
@@ -273,25 +277,8 @@ export default function UserDashboardPage() {
             {modules.map((module) => {
               const progress = progressList.find((item) => item.moduleId === module.id);
               const requiredScore = module.requiredCompletionScore ?? 70;
-              const isCompleted =
-                progress?.status === "completed" &&
-                (progress.overallScore ?? 0) >= requiredScore;
-              const isUnlocked =
-                !module.prerequisites?.length ||
-                module.prerequisites.every((prerequisite) =>
-                  modules.some((prerequisiteModule) => prerequisiteModule.id === prerequisite) &&
-                  (() => {
-                    const prerequisiteModule = modules.find((item) => item.id === prerequisite);
-                    const prerequisiteProgress = progressList.find(
-                      (item) => item.moduleId === prerequisite
-                    );
-                    return (
-                      prerequisiteProgress?.status === "completed" &&
-                      (prerequisiteProgress.overallScore ?? 0) >=
-                        (prerequisiteModule?.requiredCompletionScore ?? 70)
-                    );
-                  })()
-                );
+              const isCompleted = (progress?.overallScore ?? 0) >= requiredScore;
+              const isUnlocked = isModuleUnlocked(module, modules, progressList);
               const content = (
                 <span className="flex h-full flex-col justify-between gap-3">
                   <span className="flex items-start justify-between gap-2">

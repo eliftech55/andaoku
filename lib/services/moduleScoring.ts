@@ -56,8 +56,8 @@ export function isModuleUnlocked(
     const prerequisiteProgress = progress.find((item) => item.moduleId === prerequisiteId);
     return Boolean(
       prerequisiteModule &&
-      prerequisiteProgress?.status === "completed" &&
-      (prerequisiteProgress.overallScore ?? 0) >= (prerequisiteModule.requiredCompletionScore ?? 70)
+      (prerequisiteProgress?.overallScore ?? 0) >=
+        (prerequisiteModule.requiredCompletionScore ?? 70)
     );
   });
 }

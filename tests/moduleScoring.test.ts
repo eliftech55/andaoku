@@ -140,4 +140,20 @@ describe("module unlocking", () => {
 
     expect(isModuleUnlocked(lockedModule, [prerequisite, lockedModule], progress)).toBe(true);
   });
+
+  it("unlocks a module when the prerequisite score meets the threshold even if status is stale", () => {
+    const progress: UserProgress[] = [{
+      id: "progress-1",
+      userId: "user-1",
+      moduleId: "module-1",
+      status: "in_progress",
+      overallScore: 74,
+      completionPercentage: 74,
+      attemptCount: 1,
+      lastActivityAt: "",
+      updatedAt: "",
+    }];
+
+    expect(isModuleUnlocked(lockedModule, [prerequisite, lockedModule], progress)).toBe(true);
+  });
 });
