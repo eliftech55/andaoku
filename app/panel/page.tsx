@@ -18,11 +18,12 @@ import {
   BookOpen,
   ArrowRight,
   CheckCircle2,
+  Lock,
   Calendar,
   AlertCircle,
 } from "lucide-react";
 import { getUserAssessmentResults, getUserProgressList, getUserReadingSessions } from "@/lib/firebase/firestore";
-import { AssessmentResult, UserProgress, ReadingSession } from "@/lib/types";
+import { AssessmentResult, LearningModule, UserProgress, ReadingSession } from "@/lib/types";
 import { generateLearningRecommendation } from "@/lib/services/recommendationEngine";
 import { fetchAllModules, fetchActivities } from "@/lib/services/contentService";
 import { ProgressCharts } from "@/components/charts/ProgressCharts";
@@ -34,6 +35,7 @@ export default function UserDashboardPage() {
   const [assessmentResults, setAssessmentResults] = useState<AssessmentResult[]>([]);
   const [progressList, setProgressList] = useState<UserProgress[]>([]);
   const [totalModules, setTotalModules] = useState(0);
+  const [modules, setModules] = useState<LearningModule[]>([]);
   const [readingSessions, setReadingSessions] = useState<ReadingSession[]>([]);
   const [recommendation, setRecommendation] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -54,6 +56,7 @@ export default function UserDashboardPage() {
         setAssessmentResults(results);
         setProgressList(progress);
         setTotalModules(modules.length);
+        setModules(modules.sort((left, right) => left.order - right.order));
         setReadingSessions(sessions);
 
         // Kural tabanlı öneri motorunu çalıştır
@@ -214,10 +217,10 @@ export default function UserDashboardPage() {
         <ProgressCharts assessmentResults={assessmentResults} />
       </div>
 
-      {/* ALT ALAN: 10 AŞAMALI ÖĞRENME YOLU ÖN İZLEMESİ */}
+      {/* MODÜLLER */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold font-serif text-charcoal">Kişisel Öğrenme Yolunuz</h2>
+          <h2 className="text-xl font-bold font-serif text-charcoal">Modüllerim</h2>
           <div className="flex flex-wrap items-center gap-3">
             <Link href="/panel/egzersizler" className="text-xs font-semibold text-brand-800 hover:underline flex items-center gap-1">
               Egzersizlerim <ArrowRight className="h-3.5 w-3.5" />
@@ -235,47 +238,51 @@ export default function UserDashboardPage() {
           </div>
           <Progress value={totalModules ? (completedModulesCount / totalModules) * 100 : 0} />
 
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2">
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => {
-              const isCompleted = num <= completedModulesCount;
-              const isCurrent = num === completedModulesCount + 1;
-
-              return (
-                <div
-                  key={num}
-                  className={`p-3 rounded-2xl border text-center transition-all ${
-                    isCompleted
-                      ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-                      : isCurrent
-                      ? "bg-amber-50 border-amber-300 text-amber-900 shadow-sm"
-                      : "bg-ivory-warm border-sage-200 text-charcoal-muted opacity-70"
-                  }`}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 pt-2">
+            {modules.map((module) => {
+              const progress = progressList.find((item) => item.moduleId === module.id);
+              const isCompleted = progress?.status === "completed";
+              const isUnlocked =
+                !module.prerequisites?.length ||
+                module.prerequisites.every((prerequisite) =>
+                  progressList.some(
+                    (item) => item.moduleId === prerequisite && item.status === "completed"
+                  )
+                );
+              const content = (
+                <span className="flex h-full flex-col justify-between gap-3">
+                  <span className="flex items-start justify-between gap-2">
+                    <span>
+                      <span className="block text-xs font-bold uppercase text-charcoal-muted">
+                        Modül {String(module.order).padStart(2, "0")}
+                      </span>
+                      <span className="mt-1 block font-semibold text-charcoal">{module.title}</span>
+                    </span>
+                    {isCompleted ? (
+                      <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
+                    ) : isUnlocked ? (
+                      <Play className="h-5 w-5 shrink-0 text-amber-700" />
+                    ) : (
+                      <Lock className="h-5 w-5 shrink-0 text-charcoal-muted" />
+                    )}
+                  </span>
+                  <span className="flex items-center justify-between text-xs text-charcoal-muted">
+                    <span>{isCompleted ? `Tamamlandı · %${progress?.overallScore || 0}` : isUnlocked ? "Çalışmaya başla" : "Ön koşul kilitli"}</span>
+                    {isUnlocked && !isCompleted && <ArrowRight className="h-3.5 w-3.5" />}
+                  </span>
+                </span>
+              );
+              return isUnlocked ? (
+                <Link
+                  key={module.id}
+                  href={`/panel/ogrenme-yolu#module-${encodeURIComponent(module.id)}`}
+                  className={`rounded-2xl border p-4 transition-all hover:border-amber-400 ${isCompleted ? "border-emerald-200 bg-emerald-50/60" : "border-amber-300 bg-amber-50/60"}`}
                 >
-                  <span className="text-[10px] uppercase font-bold block mb-1">Modül 0{num}</span>
-                  <span className="text-xs font-semibold block truncate">
-                    {num === 1
-                      ? "Değerlendirme"
-                      : num === 2
-                      ? "Görsel Dikkat"
-                      : num === 3
-                      ? "Kelime Tanıma"
-                      : num === 4
-                      ? "Blok Okuma"
-                      : num === 5
-                      ? "Akıcılık"
-                      : num === 6
-                      ? "Tarama"
-                      : num === 7
-                      ? "Anlama"
-                      : num === 8
-                      ? "Stratejiler"
-                      : num === 9
-                      ? "Laboratuvar"
-                      : "Son Test"}
-                  </span>
-                  <span className="text-[9px] mt-1 block">
-                    {isCompleted ? "Tamamlandı" : isCurrent ? "Aktif" : "Kilitli"}
-                  </span>
+                  {content}
+                </Link>
+              ) : (
+                <div key={module.id} aria-disabled="true" className="rounded-2xl border border-sage-200 bg-ivory-warm p-4 opacity-70">
+                  {content}
                 </div>
               );
             })}

@@ -181,7 +181,7 @@ export default function OgrenmeYoluPage() {
           const moduleProgress = progressList.find((progress) => progress.moduleId === mod.id);
 
           return (
-            <div key={mod.id} className="relative flex flex-col sm:flex-row gap-6 items-start">
+            <div id={`module-${mod.id}`} key={mod.id} className="relative flex flex-col sm:flex-row gap-6 items-start scroll-mt-24">
               {/* Durum Rozeti / Numaratör */}
               <div
                 className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl z-10 shadow-sm font-bold text-lg transition-transform ${
