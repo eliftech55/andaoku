@@ -32,6 +32,10 @@ interface FlashWordRound {
   oddOneOut: string;
 }
 
+interface WordMemoryRound {
+  words: string[];
+}
+
 const DISTRACTORS: Record<ExerciseKind, string[]> = {
   peripheral_vision: ["▲", "■", "◆", "✦", "●", "○"],
   target_scan: ["R", "H", "K", "4", "Λ", "A"],
@@ -107,9 +111,12 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   const [saccadeError, setSaccadeError] = useState(false);
   const [flashRounds, setFlashRounds] = useState<FlashRound[]>([]);
   const [flashWordRounds, setFlashWordRounds] = useState<FlashWordRound[]>([]);
+  const [wordMemoryRounds, setWordMemoryRounds] = useState<WordMemoryRound[]>([]);
   const [flashIndex, setFlashIndex] = useState(0);
   const [flashStage, setFlashStage] = useState<"show" | "choose">("show");
   const [flashCountdown, setFlashCountdown] = useState(0);
+  const [wordMemoryInput, setWordMemoryInput] = useState("");
+  const [wordMemoryError, setWordMemoryError] = useState("");
   const [correctAnswers, setCorrectAnswers] = useState(0);
   const [summary, setSummary] = useState<ExerciseResult | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -149,6 +156,8 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     setSaveError(null);
     setSavePending(false);
     setSaccadeError(false);
+    setWordMemoryInput("");
+    setWordMemoryError("");
     setTimeLeft(durationLimit);
     startedAt.current = Date.now();
 
@@ -191,6 +200,17 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       setFlashIndex(0);
       setFlashStage("show");
       setFlashCountdown(Math.ceil(flashDuration / 1000));
+    } else if (kind === "word_memory") {
+      const sourceWords = words.length ? words : DISTRACTORS.word_memory;
+      const rounds = Array.from({ length: targetCount }, () => ({
+        words: shuffled(sourceWords).slice(0, sequenceLength),
+      }));
+      setWordMemoryRounds(rounds);
+      setFlashRounds([]);
+      setFlashWordRounds([]);
+      setFlashIndex(0);
+      setFlashStage("show");
+      setFlashCountdown(Math.ceil(flashDuration / 1000));
     } else if (FLASH_LIKE_KINDS.includes(kind)) {
       const sourceWords = words.length ? words : DISTRACTORS[kind];
       const rounds = Array.from({ length: targetCount }, () => {
@@ -207,7 +227,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   };
 
   useEffect(() => {
-    if (phase !== "playing" || kind !== "flash_words" || flashStage !== "show") return;
+    if (phase !== "playing" || !["flash_words", "word_memory"].includes(kind) || flashStage !== "show") return;
     setFlashCountdown(Math.ceil(flashDuration / 1000));
     const timer = window.setInterval(() => {
       setFlashCountdown((current) => {
@@ -284,6 +304,37 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     }
     setFlashIndex(next);
     setFlashStage("show");
+  };
+
+  const handleWordMemorySubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (phase !== "playing" || kind !== "word_memory" || flashStage !== "choose") return;
+
+    const expected = wordMemoryRounds[flashIndex]?.words ?? [];
+    const answer = wordMemoryInput
+      .split(",")
+      .map((word) => word.trim().toLocaleLowerCase("tr-TR"))
+      .filter(Boolean);
+    const isCorrect = answer.length === expected.length
+      && answer.every((word, index) => word === expected[index].toLocaleLowerCase("tr-TR"));
+
+    if (isCorrect) {
+      correctRef.current += 1;
+      setCorrectAnswers(correctRef.current);
+    } else {
+      wrongRef.current += 1;
+    }
+
+    const next = flashIndex + 1;
+    if (next >= wordMemoryRounds.length) {
+      finish(correctRef.current, wrongRef.current, wordMemoryRounds.length);
+      return;
+    }
+    setFlashIndex(next);
+    setFlashStage("show");
+    setFlashCountdown(Math.ceil(flashDuration / 1000));
+    setWordMemoryInput("");
+    setWordMemoryError("");
   };
 
   const title = activity.title;
@@ -380,7 +431,51 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
           </div>
         )}
 
-        {phase === "playing" && kind !== "flash_words" && FLASH_LIKE_KINDS.includes(kind) && flashRounds[flashIndex] && (
+        {phase === "playing" && kind === "word_memory" && wordMemoryRounds[flashIndex] && (
+          <div className="space-y-4 rounded-xl bg-ivory-warm p-6 text-center">
+            <p className="text-xs text-charcoal-muted">Tur {flashIndex + 1}/{wordMemoryRounds.length} · {wordMemoryRounds[flashIndex].words.length} kelime</p>
+            {flashStage === "show" ? (
+              <>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-charcoal">Kelimeleri sırayla aklınızda tutun:</p>
+                  <span className="rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-sm font-bold tabular-nums text-amber-900" aria-live="polite">
+                    {flashCountdown} sn
+                  </span>
+                </div>
+                <div aria-live="polite" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {wordMemoryRounds[flashIndex].words.map((word) => (
+                    <div key={word} className="rounded-lg border border-amber-200 bg-white px-3 py-3 text-lg font-bold text-brand-900">{word}</div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <form className="space-y-3 text-left" onSubmit={handleWordMemorySubmit}>
+                <label htmlFor="word-memory-answer" className="text-sm font-semibold text-charcoal">
+                  Hatırladığınız kelimeleri gösterilen sırayla virgülle yazın:
+                </label>
+                <input
+                  id="word-memory-answer"
+                  type="text"
+                  value={wordMemoryInput}
+                  onChange={(event) => {
+                    setWordMemoryInput(event.target.value);
+                    setWordMemoryError("");
+                  }}
+                  placeholder="ör. kitap, nehir, ışık, kalem"
+                  autoComplete="off"
+                  autoFocus
+                  className="w-full rounded-lg border border-sage-300 bg-white px-3 py-3 text-charcoal outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+                />
+                {wordMemoryError && <p role="alert" className="text-sm text-rose-700">{wordMemoryError}</p>}
+                <Button type="submit" variant="primary" disabled={!wordMemoryInput.trim()}>
+                  Cevabı gönder
+                </Button>
+              </form>
+            )}
+          </div>
+        )}
+
+        {phase === "playing" && kind !== "flash_words" && kind !== "word_memory" && FLASH_LIKE_KINDS.includes(kind) && flashRounds[flashIndex] && (
           <div className="space-y-4 rounded-xl bg-ivory-warm p-6 text-center">
             <p className="text-xs text-charcoal-muted">Kelime {flashIndex + 1}/{flashRounds.length}</p>
             {flashStage === "show" ? (
