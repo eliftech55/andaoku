@@ -21,6 +21,15 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { Activity, ReadingPassage, Question } from "@/lib/types";
 
+interface LabHistoryEntry {
+  passageId: string;
+  comprehensionScore: number;
+  wpm: number;
+  completedAt: string;
+}
+
+const LAB_HISTORY_PREFIX = "andaoku_lab_history";
+
 export default function OkumaLaboratuvariPage() {
   return (
     <Suspense
@@ -52,6 +61,9 @@ function OkumaLaboratuvariContent() {
     useState<"matrix" | EyeMovementExerciseType>("matrix");
   const [requestedModuleId, setRequestedModuleId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [labHistory, setLabHistory] = useState<LabHistoryEntry[]>([]);
+
+  const historyKey = `${LAB_HISTORY_PREFIX}_${user?.uid || profile?.uid || "guest"}`;
 
   useEffect(() => {
     setActiveTab(searchParams.get("tab") === "minigame" ? "minigame" : "reader");
@@ -71,26 +83,23 @@ function OkumaLaboratuvariContent() {
         const exerciseList = await fetchExerciseContent();
         const list = exerciseList.map((content) => content.passage);
         const hasRequestedContent = Boolean(moduleId || activityId || searchParams.get("passageId"));
-        let availableList = list;
-        if (!user && !profile && !hasRequestedContent) {
-          const easyPassages = list.filter((passage) => passage.difficulty === "beginner");
-          const previousIds = JSON.parse(
-            localStorage.getItem("andaoku_lab_seen_passages") || "[]"
-          ) as string[];
-          const unseen = easyPassages.filter((passage) => !previousIds.includes(passage.id));
-          availableList = unseen.length > 0 ? unseen : easyPassages;
-          if (availableList.length > 0) {
-            const randomPassage = availableList[Math.floor(Math.random() * availableList.length)];
-            localStorage.setItem(
-              "andaoku_lab_seen_passages",
-              JSON.stringify([
-                ...previousIds.filter((id) => id !== randomPassage.id),
-                randomPassage.id,
-              ].slice(-50))
-            );
-            availableList = [randomPassage];
-          }
-        }
+        const eligiblePassages = !user && !profile
+          ? list.filter((passage) => passage.difficulty === "beginner")
+          : list;
+        const storedHistory = typeof window !== "undefined"
+          ? JSON.parse(localStorage.getItem(historyKey) || "[]") as LabHistoryEntry[]
+          : [];
+        const completedIds = new Set(storedHistory.map((entry) => entry.passageId));
+        const unseenPassages = eligiblePassages.filter((passage) => !completedIds.has(passage.id));
+        const randomUnseen = unseenPassages.length > 0
+          ? unseenPassages[Math.floor(Math.random() * unseenPassages.length)]
+          : null;
+        const availableList = hasRequestedContent
+          ? list
+          : randomUnseen
+            ? [randomUnseen]
+            : eligiblePassages;
+        if (active) setLabHistory(storedHistory);
         const requestedPassageId = activity?.contentConfig.passageId || searchParams.get("passageId");
         let target: ReadingPassage | null = requestedPassageId
           ? availableList.find((passage) => passage.id === requestedPassageId) || null
@@ -122,7 +131,7 @@ function OkumaLaboratuvariContent() {
     return () => {
       active = false;
     };
-  }, [searchParams]);
+  }, [searchParams, historyKey]);
 
   const handlePassageSelect = async (p: ReadingPassage) => {
     setSelectedPassage(p);
@@ -131,6 +140,39 @@ function OkumaLaboratuvariContent() {
       ? exerciseContent.questions
       : await fetchQuestionsForPassage(p.id);
     setQuestions(qList);
+  };
+
+  const handleLabComplete = (result: {
+    wpm: number;
+    comprehensionScore: number;
+    durationSeconds: number;
+  }) => {
+    if (!selectedPassage || searchParams.get("moduleId") || searchParams.get("activityId")) return;
+    const nextEntry = {
+      passageId: selectedPassage.id,
+      comprehensionScore: result.comprehensionScore,
+      wpm: result.wpm,
+      completedAt: new Date().toISOString(),
+    };
+    const nextHistory = [
+      ...labHistory.filter((entry) => entry.passageId !== selectedPassage.id),
+      nextEntry,
+    ];
+    localStorage.setItem(historyKey, JSON.stringify(nextHistory));
+    setLabHistory(nextHistory);
+    const eligibleContents = !user && !profile
+      ? exerciseContents.filter((content) => content.passage.difficulty === "beginner")
+      : exerciseContents;
+    const remaining = eligibleContents
+      .map((content) => content.passage)
+      .filter((passage) => !nextHistory.some((entry) => entry.passageId === passage.id));
+    if (remaining.length === 0) {
+      setPassages(eligibleContents.map((content) => content.passage));
+    } else {
+      const nextPassage = remaining[Math.floor(Math.random() * remaining.length)];
+      setPassages([nextPassage]);
+      void handlePassageSelect(nextPassage);
+    }
   };
 
   return (
@@ -194,6 +236,41 @@ function OkumaLaboratuvariContent() {
         </div>
       )}
 
+      {activeTab === "reader" && passages.length > 1 && passages.every((passage) =>
+        labHistory.some((entry) => entry.passageId === passage.id)
+      ) && (
+        <div className="rounded-2xl border border-sage-200 bg-white p-4 space-y-3">
+          <div>
+            <h2 className="font-bold text-charcoal">Tüm içerikleri tamamladınız</h2>
+            <p className="text-xs text-charcoal-muted">
+              Daha önce okuduğunuz içeriklerden birini puanıyla birlikte seçerek tekrar çalışabilirsiniz.
+            </p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {passages.map((passage) => {
+              const entry = labHistory.find((item) => item.passageId === passage.id);
+              return (
+                <button
+                  key={passage.id}
+                  type="button"
+                  onClick={() => handlePassageSelect(passage)}
+                  className={`rounded-xl border p-3 text-left transition-colors ${
+                    selectedPassage?.id === passage.id
+                      ? "border-brand-700 bg-brand-50"
+                      : "border-sage-200 hover:bg-ivory-warm"
+                  }`}
+                >
+                  <span className="block font-semibold text-charcoal">{passage.title}</span>
+                  <span className="mt-1 block text-xs text-charcoal-muted">
+                    Anlama: %{entry?.comprehensionScore ?? 0} · Hız: {entry?.wpm ?? 0} WPM
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* İÇERİK: LABORATUVAR VEYA MİNİ OYUN */}
       {activeTab === "reader" ? (
         selectedPassage ? (
@@ -213,6 +290,7 @@ function OkumaLaboratuvariContent() {
             readingPacingWpm={selectedActivity?.contentConfig.speedPacingWpm}
             chunkSize={selectedActivity?.contentConfig.chunkSize}
             persistResults={false}
+            onComplete={handleLabComplete}
           />
         ) : (
           <div className="p-8 text-center text-charcoal-muted">
