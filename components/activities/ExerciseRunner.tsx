@@ -192,7 +192,8 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       setSelectedCells([]);
       setWrongCells([]);
     } else if (kind === "eye_saccade") {
-      setSequence(Array.from({ length: sequenceLength }, () => Math.floor(Math.random() * 9)));
+      const positions = shuffled(Array.from({ length: 9 }, (_, index) => index));
+      setSequence(positions.slice(0, Math.min(sequenceLength, positions.length)));
       setSequenceIndex(0);
     } else if (kind === "flash_words") {
       const sourceWords = Array.from(new Set(words.length ? words : DISTRACTORS.flash_words));
