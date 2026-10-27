@@ -177,7 +177,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     completed.current = false;
     correctRef.current = 0;
     wrongRef.current = 0;
-    totalRef.current = kind === "eye_saccade" ? sequenceLength : kind === "matching_cards" ? 0 : targetCount;
+    totalRef.current = kind === "eye_saccade" ? sequenceLength : kind === "matching_cards" ? EXERCISE_ROUND_COUNT : targetCount;
     setCorrectAnswers(0);
     setSummary(null);
     setSaveError(null);
@@ -280,7 +280,6 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       setMatchingFirst(null);
       setMatchingMoves(0);
       setMatchingPairs(0);
-      totalRef.current = pairCount * EXERCISE_ROUND_COUNT;
     } else if (FLASH_LIKE_KINDS.includes(kind)) {
       const sourceWords = words.length ? words : DISTRACTORS[kind];
       const rounds = Array.from({ length: EXERCISE_ROUND_COUNT }, () => {
@@ -434,11 +433,11 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       const nextPairs = matchingPairs + 1;
       setMatchingCards(matchedCards);
       setMatchingPairs(nextPairs);
-      correctRef.current += 1;
-      setCorrectAnswers(correctRef.current);
       setMatchingFirst(null);
 
       if (nextPairs === matchingCards.length / 2) {
+        correctRef.current += 1;
+        setCorrectAnswers(correctRef.current);
         const nextRound = flashIndex + 1;
         if (nextRound >= EXERCISE_ROUND_COUNT) {
           finish(correctRef.current, wrongRef.current, totalRef.current);
