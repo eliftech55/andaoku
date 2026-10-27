@@ -18,6 +18,7 @@ import {
   fetchPassageById,
   fetchQuestionsForPassage,
 } from "@/lib/services/contentService";
+import { useAuth } from "@/contexts/AuthContext";
 import { Activity, ReadingPassage, Question } from "@/lib/types";
 
 export default function OkumaLaboratuvariPage() {
@@ -36,6 +37,7 @@ export default function OkumaLaboratuvariPage() {
 
 function OkumaLaboratuvariContent() {
   const searchParams = useSearchParams();
+  const { user, profile } = useAuth();
   const initialTab = searchParams.get("tab") === "minigame" ? "minigame" : "reader";
 
   const [activeTab, setActiveTab] = useState<"reader" | "minigame">(initialTab);
@@ -68,16 +70,37 @@ function OkumaLaboratuvariContent() {
 
         const exerciseList = await fetchExerciseContent();
         const list = exerciseList.map((content) => content.passage);
+        const hasRequestedContent = Boolean(moduleId || activityId || searchParams.get("passageId"));
+        let availableList = list;
+        if (!user && !profile && !hasRequestedContent) {
+          const easyPassages = list.filter((passage) => passage.difficulty === "beginner");
+          const previousIds = JSON.parse(
+            localStorage.getItem("andaoku_lab_seen_passages") || "[]"
+          ) as string[];
+          const unseen = easyPassages.filter((passage) => !previousIds.includes(passage.id));
+          availableList = unseen.length > 0 ? unseen : easyPassages;
+          if (availableList.length > 0) {
+            const randomPassage = availableList[Math.floor(Math.random() * availableList.length)];
+            localStorage.setItem(
+              "andaoku_lab_seen_passages",
+              JSON.stringify([
+                ...previousIds.filter((id) => id !== randomPassage.id),
+                randomPassage.id,
+              ].slice(-50))
+            );
+            availableList = [randomPassage];
+          }
+        }
         const requestedPassageId = activity?.contentConfig.passageId || searchParams.get("passageId");
         let target: ReadingPassage | null = requestedPassageId
-          ? list.find((passage) => passage.id === requestedPassageId) || null
-          : list[0] || null;
+          ? availableList.find((passage) => passage.id === requestedPassageId) || null
+          : availableList[0] || null;
         if (!target && requestedPassageId) {
           target = await fetchPassageById(requestedPassageId);
         }
         if (!active) return;
         setExerciseContents(exerciseList);
-        setPassages(moduleId ? (target ? [target] : []) : list);
+        setPassages(moduleId || hasRequestedContent ? (target ? [target] : []) : availableList);
         setSelectedPassage(target);
         if (!target) {
           setQuestions([]);

@@ -68,7 +68,7 @@ export interface ReadingPassage {
   educationLevels: EducationLevel[];
   learningStage?: LearningStage;
   ageGroups: string[];
-  difficulty: DifficultyLevel;
+  difficulty?: DifficultyLevel;
   genre: "bilgilendirici" | "oykuleyici" | "aciklayici" | "akademik" | "diger";
   topic: string;
   targetSkills: string[];
@@ -359,6 +359,7 @@ export interface PlacementExam {
   description: string;
   educationLevels: EducationLevel[];
   learningStage?: LearningStage;
+  difficulty?: DifficultyLevel;
   ageGroups: string[];
   targetSkills: string[];
   passageId: string;

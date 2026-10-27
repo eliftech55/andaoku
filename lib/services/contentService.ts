@@ -27,7 +27,7 @@ import {
   EducationLevel,
   DifficultyLevel,
 } from "../types";
-import { getPublishedPlacementPackagesByStage } from "./placementExamService";
+import { getPublishedPlacementPackages } from "./placementExamService";
 
 export async function fetchAllModules(): Promise<LearningModule[]> {
   try {
@@ -63,7 +63,7 @@ export async function fetchPassages(
 export async function fetchExerciseContent(): Promise<
   { passage: ReadingPassage; questions: Question[] }[]
 > {
-  const packages = await getPublishedPlacementPackagesByStage("exercises");
+  const packages = await getPublishedPlacementPackages();
 
   return packages.map(({ exam, passage, questions }) => ({
     passage: {

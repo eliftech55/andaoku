@@ -2,15 +2,7 @@ import { z } from "zod";
 
 export const generationInputSchema = z.object({
   topic: z.string().trim().min(2).max(120),
-  learningStage: z.enum([
-    "placement_exam",
-    "exercises",
-    "module_1",
-    "module_2",
-    "module_3",
-    "module_4",
-    "module_5",
-  ]),
+  targetDifficulty: z.enum(["beginner", "intermediate", "advanced"]),
   educationLevels: z
     .array(z.enum(["primary", "middle", "high", "university", "adult"]))
     .min(1)
@@ -33,6 +25,7 @@ export const generatedContentSchema = z.object({
   passageContent: z.string().min(300).max(10000),
   genre: z.enum(["bilgilendirici", "oykuleyici", "aciklayici", "akademik", "diger"]),
   topic: z.string().min(2).max(120),
+  difficulty: z.enum(["beginner", "intermediate", "advanced"]),
   questions: z
     .array(
       z.object({

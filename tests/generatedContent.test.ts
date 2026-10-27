@@ -21,6 +21,7 @@ const validGeneratedContent = {
   passageContent: "a".repeat(300),
   genre: "bilgilendirici" as const,
   topic: "Doğa",
+  difficulty: "beginner" as const,
   questions: Array.from({ length: 10 }, (_, index) => validQuestion(index)),
 };
 
@@ -38,18 +39,18 @@ describe("AI generated content schema", () => {
     ).toBe(false);
   });
 
-  it("validates topic, learning stage, and target audience before generation", () => {
+  it("validates topic, target difficulty, and target audience before generation", () => {
     expect(
       generationInputSchema.safeParse({
         topic: "Doğa",
-        learningStage: "module_1",
+        targetDifficulty: "beginner",
         educationLevels: ["middle"],
       }).success
     ).toBe(true);
     expect(
       generationInputSchema.safeParse({
         topic: "",
-        learningStage: "invalid",
+        targetDifficulty: "invalid",
         educationLevels: [],
       }).success
     ).toBe(false);

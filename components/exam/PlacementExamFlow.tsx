@@ -83,7 +83,9 @@ export function PlacementExamFlow() {
       const uid = user?.uid || profile?.uid || "demo-learner-123";
 
       try {
-        const examData = await getRandomPlacementExam();
+        const prev = await getUserPlacementAttempts(uid);
+        setPreviousAttempts(prev);
+        const examData = await getRandomPlacementExam(prev.map((attempt) => attempt.examId));
         if (examData) {
           setExam(examData.exam);
           setPassage(examData.passage);
@@ -91,8 +93,6 @@ export function PlacementExamFlow() {
           setQuestions(sanitizedQuestions);
         }
 
-        const prev = await getUserPlacementAttempts(uid);
-        setPreviousAttempts(prev);
       } catch (e) {
         console.error("Sınav yüklenirken hata:", e);
       } finally {

@@ -11,6 +11,7 @@ import {
   PlacementResponse,
   PlacementProfile,
   LearningStage,
+  DifficultyLevel,
 } from "../types";
 import {
   SEED_PLACEMENT_EXAMS,
@@ -54,7 +55,29 @@ function omitUndefinedFields<T extends object>(value: T): Partial<T> {
 export async function getPlacementExamsFromDatabase(): Promise<PlacementExam[]> {
   assertFirebaseConfigured();
   const snapshot = await getDocs(collection(db, "placementExams"));
-  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as PlacementExam));
+  const exams = snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as PlacementExam));
+  const updates = exams.filter((exam) => !exam.difficulty);
+  if (updates.length > 0) {
+    const batch = writeBatch(db);
+    updates.forEach((exam) => {
+      const difficulty = difficultyFromLegacyStage(exam.learningStage);
+      batch.set(doc(db, "placementExams", exam.code), { difficulty, updatedAt: new Date().toISOString() }, { merge: true });
+      batch.set(
+        doc(db, "placementPassages", exam.passageId),
+        { difficulty, updatedAt: new Date().toISOString() },
+        { merge: true }
+      );
+      exam.difficulty = difficulty;
+    });
+    await batch.commit();
+  }
+  return exams;
+}
+
+function difficultyFromLegacyStage(stage?: LearningStage): DifficultyLevel {
+  if (stage === "module_4" || stage === "module_5") return "advanced";
+  if (stage === "module_2" || stage === "module_3") return "intermediate";
+  return "beginner";
 }
 
 export async function getPlacementPassageFromDatabase(
@@ -130,18 +153,16 @@ export async function deletePlacementExamPackageFromDatabase(exam: PlacementExam
 }
 
 /**
- * Yayınlanmış başlangıç sınavlarından rastgele bir paket getirir.
+ * Yayınlanmış içeriklerden daha önce tamamlanmamış rastgele bir paket getirir.
  */
-export async function getRandomPlacementExam(): Promise<{
+export async function getRandomPlacementExam(excludedExamIds: string[] = []): Promise<{
   exam: PlacementExam;
   passage: PlacementPassage;
 } | null> {
   const allExams = await getAllPlacementExams();
-  const placementExams = allExams.filter(
-    (e) =>
-      e.status === "published" &&
-      (e.learningStage === undefined || e.learningStage === "placement_exam")
-  );
+  const availableExams = allExams.filter((e) => e.status === "published");
+  const unseenExams = availableExams.filter((exam) => !excludedExamIds.includes(exam.code));
+  const placementExams = unseenExams.length > 0 ? unseenExams : availableExams;
 
   if (placementExams.length === 0) return null;
 
@@ -175,6 +196,30 @@ export async function getPublishedPlacementPackagesByStage(
     })
   );
 
+  return packages.filter(
+    (content): content is NonNullable<typeof content> => content !== null
+  );
+}
+
+export async function getPublishedPlacementPackages(): Promise<
+  { exam: PlacementExam; passage: PlacementPassage; questions: PlacementQuestion[] }[]
+> {
+  const exams = (await getAllPlacementExams()).filter((exam) => exam.status === "published");
+  const packages = await Promise.all(
+    exams.map(async (exam) => {
+      const [passage, questions] = await Promise.all([
+        getPlacementPassageById(exam.passageId),
+        getQuestionsByExamCode(exam.code),
+      ]);
+      if (!passage) return null;
+      const difficulty = passage.difficulty || exam.difficulty || difficultyFromLegacyStage(exam.learningStage);
+      return {
+        exam: { ...exam, difficulty },
+        passage: { ...passage, difficulty },
+        questions,
+      };
+    })
+  );
   return packages.filter(
     (content): content is NonNullable<typeof content> => content !== null
   );

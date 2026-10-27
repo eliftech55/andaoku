@@ -8,7 +8,7 @@ import {
   PlacementPassage,
   PlacementQuestion,
   EducationLevel,
-  LearningStage,
+  DifficultyLevel,
   ContentStatus,
   PlacementQuestionCategory,
 } from "@/lib/types";
@@ -41,14 +41,10 @@ import {
   BookOpen,
 } from "lucide-react";
 
-const learningStages: { value: LearningStage; label: string }[] = [
-  { value: "placement_exam", label: "Başlangıç sınavı" },
-  { value: "exercises", label: "Alıştırmalar" },
-  { value: "module_1", label: "Modül 1" },
-  { value: "module_2", label: "Modül 2" },
-  { value: "module_3", label: "Modül 3" },
-  { value: "module_4", label: "Modül 4" },
-  { value: "module_5", label: "Modül 5" },
+const difficultyLevels: { value: DifficultyLevel; label: string }[] = [
+  { value: "beginner", label: "Kolay" },
+  { value: "intermediate", label: "Orta" },
+  { value: "advanced", label: "Zor" },
 ];
 
 const GENERATION_POLL_INTERVAL_MS = 10000;
@@ -84,7 +80,7 @@ export default function BaslangicSinavlariYonetimPage() {
   const [formExamTitle, setFormExamTitle] = useState("");
   const [formExamCode, setFormExamCode] = useState("");
   const [formDescription, setFormDescription] = useState("");
-  const [formStage, setFormStage] = useState<LearningStage>("placement_exam");
+  const [formDifficulty, setFormDifficulty] = useState<DifficultyLevel>("beginner");
   const [formEducationLevels, setFormEducationLevels] = useState<EducationLevel[]>(["middle"]);
   const [formStatus, setFormStatus] = useState<ContentStatus>("published");
 
@@ -181,7 +177,7 @@ export default function BaslangicSinavlariYonetimPage() {
     const newCode = "sinav-" + Date.now();
     setFormExamCode(newCode);
     setFormDescription("Yeni okuma ve anlama içerik paketi.");
-    setFormStage("placement_exam");
+    setFormDifficulty("beginner");
     setFormEducationLevels(["middle"]);
     setFormStatus("draft");
 
@@ -221,7 +217,7 @@ export default function BaslangicSinavlariYonetimPage() {
         },
         body: JSON.stringify({
           topic: formTopic.trim(),
-          learningStage: formStage,
+          targetDifficulty: formDifficulty,
           educationLevels: formEducationLevels,
         }),
       });
@@ -294,6 +290,7 @@ export default function BaslangicSinavlariYonetimPage() {
       setFormPassageContent(result.passageContent);
       setFormGenre(result.genre);
       setFormTopic(result.topic);
+      setFormDifficulty(result.difficulty);
       setFormQuestions(generatedQuestions);
       setActiveQuestionTab(0);
       setFormStatus("draft");
@@ -315,7 +312,7 @@ export default function BaslangicSinavlariYonetimPage() {
     setFormExamTitle(exam.title);
     setFormExamCode(exam.code);
     setFormDescription(exam.description);
-    setFormStage(exam.learningStage || "placement_exam");
+    setFormDifficulty(exam.difficulty || "beginner");
     setFormEducationLevels(exam.educationLevels?.length ? exam.educationLevels : ["middle"]);
     setFormStatus(exam.status);
     setGenerationError(null);
@@ -462,14 +459,8 @@ export default function BaslangicSinavlariYonetimPage() {
       content: formPassageContent,
       wordCount,
       educationLevels: formEducationLevels,
-      learningStage: formStage,
+      difficulty: formDifficulty,
       ageGroups: ["all"],
-      difficulty:
-        formEducationLevels[0] === "primary"
-          ? "beginner"
-          : formEducationLevels[0] === "middle"
-            ? "intermediate"
-            : "advanced",
       genre: formGenre,
       topic: formTopic || "Genel Kültür",
       version: 1,
@@ -485,7 +476,7 @@ export default function BaslangicSinavlariYonetimPage() {
       title: formExamTitle,
       description: formDescription,
       educationLevels: formEducationLevels,
-      learningStage: formStage,
+      difficulty: formDifficulty,
       ageGroups: ["all"],
       targetSkills: ["ana_fikir", "cikarim_yapma", "acik_bilgi"],
       passageId,
@@ -608,7 +599,7 @@ export default function BaslangicSinavlariYonetimPage() {
                   <td className="p-3.5 font-mono text-[11px] text-charcoal-muted">{ex.code}</td>
                   <td className="p-3.5 capitalize">
                     <Badge variant="secondary" className="text-[10px]">
-                      {learningStages.find((stage) => stage.value === (ex.learningStage || "placement_exam"))?.label}
+                      {difficultyLevels.find((level) => level.value === (ex.difficulty || "beginner"))?.label}
                     </Badge>
                   </td>
                   <td className="p-3.5 font-mono font-semibold text-brand-900">
@@ -732,13 +723,13 @@ export default function BaslangicSinavlariYonetimPage() {
               <div>
                 <label className="font-semibold block mb-1">Seviye</label>
                 <select
-                  value={formStage}
-                  onChange={(e) => setFormStage(e.target.value as LearningStage)}
+                  value={formDifficulty}
+                  onChange={(e) => setFormDifficulty(e.target.value as DifficultyLevel)}
                   className="w-full p-2 rounded-xl border border-sage-200 bg-white"
                 >
-                  {learningStages.map((stage) => (
-                    <option key={stage.value} value={stage.value}>
-                      {stage.label}
+                  {difficultyLevels.map((level) => (
+                    <option key={level.value} value={level.value}>
+                      {level.label}
                     </option>
                   ))}
                 </select>
