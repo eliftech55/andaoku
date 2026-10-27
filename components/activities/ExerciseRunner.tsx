@@ -163,6 +163,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     setSavePending(false);
     setSaccadeError(false);
     setWordMemoryInputs([]);
+    setFlashIndex(0);
     setTimeLeft(durationLimit);
     startedAt.current = Date.now();
 
@@ -292,6 +293,18 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     correctRef.current = next;
     setCorrectAnswers(next);
     if (next === sequence.length) finish(next, wrongRef.current, sequence.length);
+  };
+
+  const handleTrackingRoundComplete = () => {
+    if (phase !== "playing" || kind !== "infinity_tracking") return;
+    correctRef.current += 1;
+    setCorrectAnswers(correctRef.current);
+    const next = flashIndex + 1;
+    if (next >= EXERCISE_ROUND_COUNT) {
+      finish(correctRef.current, wrongRef.current, EXERCISE_ROUND_COUNT);
+      return;
+    }
+    setFlashIndex(next);
   };
 
   const handleFlashChoice = (choice: string) => {
@@ -425,6 +438,24 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
                 </button>
               ))}
             </div>
+          </div>
+        )}
+
+        {phase === "playing" && kind === "infinity_tracking" && (
+          <div className="space-y-4 rounded-xl bg-ivory-warm p-6 text-center">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+              <p className="font-semibold">Nasıl yapılır?</p>
+              <p className="mt-1">Hareket eden noktayı yalnızca gözlerinizle takip edin. Başınızı sabit tutun ve nokta turunu tamamladığında devam edin.</p>
+            </div>
+            <svg viewBox="0 0 360 180" className="mx-auto h-52 w-full max-w-lg" role="img" aria-label="Sekiz şekli üzerinde hareket eden nokta">
+              <path d="M180 90 C180 20 40 20 40 90 C40 160 180 160 180 90 C180 20 320 20 320 90 C320 160 180 160 180 90" fill="none" stroke="currentColor" strokeWidth="8" className="text-brand-300" />
+              <circle r="10" fill="currentColor" className="text-amber-500">
+                <animateMotion dur="4s" repeatCount="indefinite" path="M180 90 C180 20 40 20 40 90 C40 160 180 160 180 90 C180 20 320 20 320 90 C320 160 180 160 180 90" />
+              </circle>
+            </svg>
+            <Button type="button" variant="primary" onClick={handleTrackingRoundComplete}>
+              Turu tamamladım
+            </Button>
           </div>
         )}
 
