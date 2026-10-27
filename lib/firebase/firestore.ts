@@ -34,6 +34,7 @@ import {
   ExerciseKind,
   UserProfile,
   UserRole,
+  UserActivitySummary,
 } from "../types";
 import { BUILT_IN_EXERCISE_DEFINITIONS } from "../services/exerciseCatalog";
 import { calculateModuleScore } from "../services/moduleScoring";
@@ -635,6 +636,130 @@ export async function getAllUserProfiles(): Promise<UserProfile[]> {
     throw error;
   }
 }
+
+export async function getAllUserActivitySummaries(
+  userIds: string[]
+): Promise<Record<string, UserActivitySummary>> {
+  try {
+      const [
+        sessionsSnapshot,
+        resultsSnapshot,
+        progressSnapshot,
+        attemptsSnapshot,
+        modulesSnapshot,
+        activitiesSnapshot,
+      ] =
+        await Promise.all([
+          getDocs(collection(db, "readingSessions")),
+          getDocs(collection(db, "assessmentResults")),
+          getDocs(collection(db, "userProgress")),
+          getDocs(collection(db, "exerciseAttempts")),
+          getDocs(query(collection(db, "learningModules"), where("status", "==", "published"))),
+          getDocs(query(collection(db, "activities"), where("status", "==", "published"))),
+        ]);
+
+      const summaries: Record<string, UserActivitySummary> = {};
+      for (const userId of userIds) {
+        summaries[userId] = {
+          userId,
+          completedModules: 0,
+          totalModules: modulesSnapshot.size,
+          completedActivities: 0,
+          totalActivities: 0,
+          moduleStatus: "not_started",
+        };
+      }
+
+      const sessions = sessionsSnapshot.docs
+        .map((item) => item.data())
+        .filter((item) => typeof item.userId === "string" && summaries[item.userId])
+        .sort((left, right) =>
+          String(right.completedAt || right.createdAt || "").localeCompare(
+            String(left.completedAt || left.createdAt || "")
+          )
+        );
+      const results = resultsSnapshot.docs
+        .map((item) => item.data())
+        .filter((item) => typeof item.userId === "string" && summaries[item.userId])
+        .sort((left, right) =>
+          String(right.createdAt || "").localeCompare(String(left.createdAt || ""))
+        );
+
+      for (const session of sessions) {
+        const summary = summaries[session.userId as string];
+        if (summary.lastReadingSpeed === undefined && typeof session.wpm === "number") {
+          summary.lastReadingSpeed = session.wpm;
+        }
+      }
+      for (const result of results) {
+        const summary = summaries[result.userId as string];
+        if (
+          summary.lastComprehensionScore === undefined &&
+          typeof result.comprehensionScore === "number"
+        ) {
+          summary.lastComprehensionScore = result.comprehensionScore;
+        }
+      }
+
+      const moduleIds = new Set(modulesSnapshot.docs.map((item) => item.id));
+      const activityIds = new Set(activitiesSnapshot.docs.map((item) => item.id));
+      const totalActivities = modulesSnapshot.docs.reduce((total, module) => {
+        const activityIdsForModule = module.data().activityIds;
+        return total + (Array.isArray(activityIdsForModule) ? activityIdsForModule.length : 0);
+      }, 0);
+      for (const summary of Object.values(summaries)) {
+        summary.totalActivities = totalActivities;
+      }
+      const attemptsByUser = new Map<string, Set<string>>();
+      for (const item of attemptsSnapshot.docs) {
+        const attempt = item.data();
+        if (
+          typeof attempt.userId !== "string" ||
+          !summaries[attempt.userId] ||
+          typeof attempt.activityId !== "string" ||
+          !activityIds.has(attempt.activityId)
+        ) {
+          continue;
+        }
+        const userAttempts = attemptsByUser.get(attempt.userId) || new Set<string>();
+        userAttempts.add(attempt.activityId);
+        attemptsByUser.set(attempt.userId, userAttempts);
+      }
+      const progressByUser = new Map<string, Array<Record<string, unknown>>>();
+      for (const item of progressSnapshot.docs) {
+        const progress = item.data();
+        if (
+          typeof progress.userId !== "string" ||
+          !summaries[progress.userId] ||
+          typeof progress.moduleId !== "string" ||
+          !moduleIds.has(progress.moduleId)
+        ) {
+          continue;
+        }
+        const current = progressByUser.get(progress.userId) || [];
+        current.push(progress);
+        progressByUser.set(progress.userId, current);
+      }
+
+      progressByUser.forEach((progressList, userId) => {
+        const summary = summaries[userId];
+        const completedProgress = progressList.filter((item) => item.status === "completed");
+        summary.completedModules = completedProgress.length;
+        summary.moduleStatus =
+          completedProgress.length === moduleIds.size && moduleIds.size > 0
+            ? "completed"
+            : progressList.length > 0
+              ? "in_progress"
+              : "not_started";
+        summary.completedActivities = attemptsByUser.get(userId)?.size || 0;
+      });
+
+      return summaries;
+    } catch (error) {
+      console.error("Kullanıcı aktivite özetleri getirilemedi:", error);
+      throw error;
+    }
+  }
 
 export async function updateUserStatus(
   userId: string,

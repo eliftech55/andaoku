@@ -6,12 +6,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   createUserAssignment,
   getAllUserProfiles,
+  getAllUserActivitySummaries,
   getUserAssignments,
   updateUserAssignment,
   updateUserRole,
   updateUserStatus,
 } from "@/lib/firebase/firestore";
-import { UserAssignment, UserProfile, UserRole } from "@/lib/types";
+import { UserActivitySummary, UserAssignment, UserProfile, UserRole } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,6 +37,7 @@ export default function KullaniciYonetimiPage() {
   const { profile, user, loading: authLoading } = useAuth();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [assignments, setAssignments] = useState<Record<string, UserAssignment[]>>({});
+  const [activitySummaries, setActivitySummaries] = useState<Record<string, UserActivitySummary>>({});
   const [search, setSearch] = useState("");
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [role, setRole] = useState<UserRole>("learner");
@@ -65,7 +67,8 @@ export default function KullaniciYonetimiPage() {
     async function loadUsers() {
       try {
         const list = await getAllUserProfiles();
-        const assignmentEntries = await Promise.all(
+        const [assignmentEntries, summaries] = await Promise.all([
+          Promise.all(
           list.map(async (item) => {
             try {
               return [item.uid, await getUserAssignments(item.uid)] as const;
@@ -74,10 +77,13 @@ export default function KullaniciYonetimiPage() {
               return [item.uid, []] as const;
             }
           })
-        );
+          ),
+          getAllUserActivitySummaries(list.map((item) => item.uid)),
+        ]);
         if (active) {
           setUsers(list.sort((left, right) => left.displayName.localeCompare(right.displayName, "tr")));
           setAssignments(Object.fromEntries(assignmentEntries));
+          setActivitySummaries(summaries);
         }
       } catch (loadError) {
         console.error("Kullanıcılar yüklenemedi:", loadError);
@@ -189,15 +195,20 @@ export default function KullaniciYonetimiPage() {
             <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Ad, e-posta veya rol ara..." className="w-full rounded-xl border border-sage-200 py-2.5 pl-10 pr-3 text-sm" />
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-sm">
-              <thead className="border-b border-sage-200 bg-ivory-warm text-xs text-charcoal-muted"><tr><th className="p-3">Kullanıcı</th><th className="p-3">Rol</th><th className="p-3">Durum</th><th className="p-3">Görev</th><th className="p-3 text-right">İşlem</th></tr></thead>
+            <table className="w-full min-w-[1180px] text-left text-sm">
+              <thead className="border-b border-sage-200 bg-ivory-warm text-xs text-charcoal-muted"><tr><th className="p-3">Kullanıcı</th><th className="p-3">Rol</th><th className="p-3">Durum</th><th className="p-3">Son okuma hızı</th><th className="p-3">Son anlama</th><th className="p-3">Modül durumu</th><th className="p-3">Etkinlik</th><th className="p-3">Görev</th><th className="p-3 text-right">İşlem</th></tr></thead>
               <tbody className="divide-y divide-sage-100">
-                {loading ? <tr><td colSpan={5} className="p-8 text-center text-charcoal-muted">Kullanıcılar yükleniyor...</td></tr> : filteredUsers.map((item) => {
+                {loading ? <tr><td colSpan={9} className="p-8 text-center text-charcoal-muted">Kullanıcılar yükleniyor...</td></tr> : filteredUsers.map((item) => {
                   const task = assignments[item.uid]?.find((assignment) => assignment.status === "active");
+                  const summary = activitySummaries[item.uid];
                   return <tr key={item.uid}>
                     <td className="p-3"><span className="block font-semibold text-charcoal">{item.displayName}</span><span className="text-xs text-charcoal-muted">{item.email}</span></td>
                     <td className="p-3"><Badge variant="secondary">{roleOptions.find((option) => option.value === item.role)?.label || item.role}</Badge></td>
                     <td className="p-3"><Badge variant={item.status === "active" ? "success" : item.status === "pending_verification" ? "amber" : "outline"}>{statusLabels[item.status]}</Badge></td>
+                    <td className="p-3 text-xs">{summary?.lastReadingSpeed !== undefined ? `${Math.round(summary.lastReadingSpeed)} kelime/dk` : "Henüz yok"}</td>
+                    <td className="p-3 text-xs">{summary?.lastComprehensionScore !== undefined ? `%${Math.round(summary.lastComprehensionScore)}` : "Henüz yok"}</td>
+                    <td className="p-3 text-xs">{summary?.moduleStatus === "completed" ? "Tamamlandı" : summary?.moduleStatus === "in_progress" ? "Devam ediyor" : "Başlamadı"} ({summary?.completedModules || 0}/{summary?.totalModules || 0})</td>
+                    <td className="p-3 text-xs">{summary?.completedActivities || 0}/{summary?.totalActivities || 0}</td>
                     <td className="p-3 text-xs text-charcoal-muted">{task?.title || "Görev yok"}</td>
                     <td className="p-3 text-right"><div className="flex justify-end gap-2">{item.status === "pending_verification" && <Button size="sm" variant="primary" onClick={() => void changeStatus(item, "active")}><CheckCircle2 className="mr-1 h-4 w-4" /> Onayla</Button>}{item.status === "active" && <Button size="sm" variant="outline" onClick={() => void changeStatus(item, "suspended")}><UserX className="mr-1 h-4 w-4" /> Askıya Al</Button>}{item.status === "suspended" && <Button size="sm" variant="primary" onClick={() => void changeStatus(item, "active")}>Etkinleştir</Button>}<Button size="sm" variant="outline" onClick={() => openEditor(item)}><Pencil className="mr-1 h-4 w-4" /> Düzenle</Button></div></td>
                   </tr>;

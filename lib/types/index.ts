@@ -284,6 +284,17 @@ export interface UserProgress {
   updatedAt: string;
 }
 
+export interface UserActivitySummary {
+  userId: string;
+  lastReadingSpeed?: number;
+  lastComprehensionScore?: number;
+  completedModules: number;
+  totalModules: number;
+  completedActivities: number;
+  totalActivities: number;
+  moduleStatus: "not_started" | "in_progress" | "completed";
+}
+
 export interface ClassItem {
   id: string;
   name: string;

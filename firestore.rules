@@ -76,7 +76,7 @@ service cloud.firestore {
 
     // 4b. Egzersiz Denemeleri (exerciseAttempts)
     match /exerciseAttempts/{attemptId} {
-      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isTeacher());
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isTeacher() || isAdmin());
       allow create: if isAuthenticated()
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.score is number
@@ -108,6 +108,7 @@ service cloud.firestore {
       allow read: if isAuthenticated() && (
         resource.data.userId == request.auth.uid ||
         isTeacher() ||
+        isAdmin() ||
         isResearcher()
       );
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
@@ -116,7 +117,7 @@ service cloud.firestore {
 
     // 8. Kullanıcı İlerlemesi (userProgress)
     match /userProgress/{progressId} {
-      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isTeacher());
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isTeacher() || isAdmin());
       allow create, update: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
       allow delete: if isAdmin();
     }
