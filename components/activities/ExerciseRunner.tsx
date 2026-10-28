@@ -109,16 +109,17 @@ const FLASH_LIKE_KINDS: ExerciseKind[] = [
   "visual_change",
 ];
 
-const FLASH_WORD_DURATIONS = [6000, 6000, 5000, 5000, 4000];
-const FLASH_WORD_COUNTS = [3, 4, 3, 4, 3];
-const WORD_MEMORY_DURATIONS = [10000, 10000, 9000, 8500, 8000];
+const FLASH_WORD_DURATIONS = [6000, 5500, 5000, 4500, 4000];
+const FLASH_WORD_COUNTS = [3, 4, 5, 6, 7];
+const WORD_MEMORY_DURATIONS = [10000, 9000, 8500, 8000, 7500];
 const WORD_MEMORY_COUNTS = [4, 5, 6, 7, 8];
 const EXERCISE_ROUND_COUNT = 5;
-const MEMORY_PALACE_ROUNDS = [
+const MEMORY_PALACE_LEVELS = [
   { rows: 2, columns: 2, duration: 5 },
-  { rows: 2, columns: 3, duration: 7 },
   { rows: 2, columns: 3, duration: 5 },
-  { rows: 3, columns: 3, duration: 7 },
+  { rows: 3, columns: 3, duration: 5 },
+  { rows: 3, columns: 3, duration: 4 },
+  { rows: 3, columns: 3, duration: 3 },
 ] as const;
 
 export function ExerciseRunner({ activity, onComplete, nextActivityHref }: ExerciseRunnerProps) {
@@ -144,6 +145,8 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       ? 5000
     : Math.min(3000, Math.max(200, activity.contentConfig.flashDurationMs || 1000));
   const wordMemoryDuration = WORD_MEMORY_DURATIONS[Math.min(5, Math.max(1, activity.level || 1)) - 1];
+  const memoryPalaceLevel = MEMORY_PALACE_LEVELS[Math.min(5, Math.max(1, activity.level || 1)) - 1];
+  const memoryPalaceRoundConfig = Array.from({ length: EXERCISE_ROUND_COUNT }, () => memoryPalaceLevel);
   const words = activity.contentConfig.wordList?.length
     ? activity.contentConfig.wordList
     : DISTRACTORS[kind];
@@ -226,7 +229,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
         : ["matching_cards", "point_tracking"].includes(kind)
           ? EXERCISE_ROUND_COUNT
           : kind === "memory_palace"
-            ? MEMORY_PALACE_ROUNDS.length
+            ? memoryPalaceRoundConfig.length
             : targetCount;
     setCorrectAnswers(0);
     setSummary(null);
@@ -310,7 +313,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
         ...(words.length ? words : DISTRACTORS.memory_palace),
         "kalem", "çiçek", "köprü", "bulut", "nehir", "orman", "kitap", "yıldız", "masa",
       ]));
-      const rounds = MEMORY_PALACE_ROUNDS.map(({ rows, columns }) => {
+      const rounds = memoryPalaceRoundConfig.map(({ rows, columns }) => {
         const wordCount = rows * columns;
         return {
           rows,
@@ -325,7 +328,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       setFlashWordRounds([]);
       setFlashIndex(0);
       setFlashStage("show");
-      setFlashCountdown(MEMORY_PALACE_ROUNDS[0].duration);
+      setFlashCountdown(memoryPalaceRoundConfig[0].duration);
     } else if (kind === "matching_cards") {
       const levelIndex = Math.min(5, Math.max(1, activity.level || 1)) - 1;
       const pairCount = Math.min(6, 3 + levelIndex);
@@ -438,7 +441,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     const displayDuration = kind === "word_memory"
       ? wordMemoryDuration
       : kind === "memory_palace"
-        ? MEMORY_PALACE_ROUNDS[flashIndex]?.duration ?? 5
+        ? memoryPalaceRoundConfig[flashIndex]?.duration ?? 5
         : flashDuration;
     setFlashCountdown(Math.ceil(displayDuration / 1000));
     const timer = window.setInterval(() => {
@@ -621,7 +624,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       }
       setFlashIndex(next);
       setFlashStage("show");
-      setFlashCountdown(MEMORY_PALACE_ROUNDS[next].duration);
+      setFlashCountdown(memoryPalaceRoundConfig[next].duration);
     }
   };
 
