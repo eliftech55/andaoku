@@ -190,8 +190,8 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       ? matchingMovesRef.current > 0
         ? Math.min(100, Math.round((matchingMatchesRef.current / matchingMovesRef.current) * 200))
         : 0
-      : total + wrong > 0
-        ? Math.round((correct / (total + wrong)) * 100)
+      : total > 0
+        ? Math.round((correct / total) * 100)
         : 0;
     const result = {
       score,
