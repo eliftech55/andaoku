@@ -189,6 +189,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   const correctRef = useRef(0);
   const wrongRef = useRef(0);
   const totalRef = useRef(0);
+  const flashDeadlineRef = useRef<number | null>(null);
   const matchingMatchesRef = useRef(0);
   const matchingMovesRef = useRef(0);
   const completed = useRef(false);
@@ -231,6 +232,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
           : kind === "memory_palace"
             ? memoryPalaceRoundConfig.length
             : targetCount;
+    flashDeadlineRef.current = null;
     setCorrectAnswers(0);
     setSummary(null);
     setSaveError(null);
@@ -443,21 +445,24 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       : kind === "memory_palace"
         ? memoryPalaceRoundConfig[flashIndex]?.duration ?? 5
         : flashDuration;
-    setFlashCountdown(Math.ceil(displayDuration / 1000));
-    const timer = window.setInterval(() => {
-      setFlashCountdown((current) => {
-        if (current <= 1) {
-          window.clearInterval(timer);
-          if (kind === "memory_palace") {
-            setMemoryPalacePlaced(Array(memoryPalaceRounds[flashIndex]?.words.length ?? 0).fill(null));
-          }
-          setFlashStage("choose");
-          return 0;
+    const deadline = Date.now() + displayDuration;
+    flashDeadlineRef.current = deadline;
+    const updateCountdown = () => {
+      const remaining = Math.max(0, deadline - Date.now());
+      setFlashCountdown(Math.ceil(remaining / 1000));
+      if (remaining <= 0) {
+        if (kind === "memory_palace") {
+          setMemoryPalacePlaced(Array(memoryPalaceRounds[flashIndex]?.words.length ?? 0).fill(null));
         }
-        return current - 1;
-      });
-    }, 1000);
-    return () => window.clearInterval(timer);
+        setFlashStage("choose");
+      }
+    };
+    updateCountdown();
+    const timer = window.setInterval(updateCountdown, 100);
+    return () => {
+      window.clearInterval(timer);
+      if (flashDeadlineRef.current === deadline) flashDeadlineRef.current = null;
+    };
   }, [flashDuration, flashIndex, flashStage, kind, memoryPalaceRounds, phase, sequenceMemoryStage, wordMemoryDuration]);
 
   useEffect(() => {
