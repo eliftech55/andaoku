@@ -118,8 +118,8 @@ const MEMORY_PALACE_LEVELS = [
   { rows: 2, columns: 2, duration: 5 },
   { rows: 2, columns: 3, duration: 5 },
   { rows: 3, columns: 3, duration: 5 },
-  { rows: 3, columns: 3, duration: 4 },
-  { rows: 3, columns: 3, duration: 3 },
+  { rows: 3, columns: 3, duration: 5 },
+  { rows: 3, columns: 3, duration: 5 },
 ] as const;
 
 export function ExerciseRunner({ activity, onComplete, nextActivityHref }: ExerciseRunnerProps) {
