@@ -48,9 +48,9 @@ interface WordMemoryRound {
 }
 
 interface MemoryPalaceRound {
-  object: string;
-  location: string;
-  choices: string[];
+  rows: number;
+  columns: number;
+  words: string[];
 }
 
 interface MatchingCard {
@@ -114,6 +114,12 @@ const FLASH_WORD_COUNTS = [3, 4, 3, 4, 3];
 const WORD_MEMORY_DURATIONS = [10000, 10000, 9000, 8500, 8000];
 const WORD_MEMORY_COUNTS = [4, 5, 6, 7, 8];
 const EXERCISE_ROUND_COUNT = 5;
+const MEMORY_PALACE_ROUNDS = [
+  { rows: 2, columns: 2, duration: 5 },
+  { rows: 2, columns: 3, duration: 7 },
+  { rows: 2, columns: 3, duration: 5 },
+  { rows: 3, columns: 3, duration: 7 },
+] as const;
 
 export function ExerciseRunner({ activity, onComplete, nextActivityHref }: ExerciseRunnerProps) {
   const kind = activity.type as ExerciseKind;
@@ -157,6 +163,8 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   const [passageMemoryRounds, setPassageMemoryRounds] = useState<PassageMemoryRound[]>([]);
   const [wordMemoryRounds, setWordMemoryRounds] = useState<WordMemoryRound[]>([]);
   const [memoryPalaceRounds, setMemoryPalaceRounds] = useState<MemoryPalaceRound[]>([]);
+  const [memoryPalacePlaced, setMemoryPalacePlaced] = useState<(string | null)[]>([]);
+  const [memoryPalaceDragged, setMemoryPalaceDragged] = useState<string | null>(null);
   const [matchingCards, setMatchingCards] = useState<MatchingCard[]>([]);
   const [matchingFirst, setMatchingFirst] = useState<number | null>(null);
   const [matchingBusy, setMatchingBusy] = useState(false);
@@ -217,7 +225,9 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
         ? sequenceLength
         : ["matching_cards", "point_tracking"].includes(kind)
           ? EXERCISE_ROUND_COUNT
-          : targetCount;
+          : kind === "memory_palace"
+            ? MEMORY_PALACE_ROUNDS.length
+            : targetCount;
     setCorrectAnswers(0);
     setSummary(null);
     setSaveError(null);
@@ -296,23 +306,26 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       setFlashCountdown(Math.ceil(wordMemoryDuration / 1000));
       setWordMemoryInputs(Array(rounds[0]?.words.length ?? 0).fill(""));
     } else if (kind === "memory_palace") {
-      const locations = ["salon", "mutfak", "bahçe", "masa", "saat", "kitaplık"];
-      const sourceObjects = words.length ? words : DISTRACTORS.memory_palace;
-      const rounds = Array.from({ length: EXERCISE_ROUND_COUNT }, (_, index) => {
-        const location = locations[index % locations.length];
-        const object = sourceObjects[index % sourceObjects.length];
+      const sourceWords = Array.from(new Set([
+        ...(words.length ? words : DISTRACTORS.memory_palace),
+        "kalem", "çiçek", "köprü", "bulut", "nehir", "orman", "kitap", "yıldız", "masa",
+      ]));
+      const rounds = MEMORY_PALACE_ROUNDS.map(({ rows, columns }) => {
+        const wordCount = rows * columns;
         return {
-          object,
-          location,
-          choices: shuffled(locations),
+          rows,
+          columns,
+          words: shuffled(sourceWords).slice(0, wordCount),
         };
       });
       setMemoryPalaceRounds(rounds);
+      setMemoryPalacePlaced([]);
+      setMemoryPalaceDragged(null);
       setFlashRounds([]);
       setFlashWordRounds([]);
       setFlashIndex(0);
       setFlashStage("show");
-      setFlashCountdown(5);
+      setFlashCountdown(MEMORY_PALACE_ROUNDS[0].duration);
     } else if (kind === "matching_cards") {
       const levelIndex = Math.min(5, Math.max(1, activity.level || 1)) - 1;
       const pairCount = Math.min(6, 3 + levelIndex);
@@ -422,12 +435,19 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
 
   useEffect(() => {
     if (phase !== "playing" || !["flash_words", "word_memory", "memory_palace", "chunk_reading", "passage_memory"].includes(kind) || flashStage !== "show") return;
-    const displayDuration = kind === "word_memory" ? wordMemoryDuration : kind === "memory_palace" ? 5000 : flashDuration;
+    const displayDuration = kind === "word_memory"
+      ? wordMemoryDuration
+      : kind === "memory_palace"
+        ? MEMORY_PALACE_ROUNDS[flashIndex]?.duration ?? 5
+        : flashDuration;
     setFlashCountdown(Math.ceil(displayDuration / 1000));
     const timer = window.setInterval(() => {
       setFlashCountdown((current) => {
         if (current <= 1) {
           window.clearInterval(timer);
+          if (kind === "memory_palace") {
+            setMemoryPalacePlaced(Array(memoryPalaceRounds[flashIndex]?.words.length ?? 0).fill(null));
+          }
           setFlashStage("choose");
           return 0;
         }
@@ -435,7 +455,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       });
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [flashDuration, flashIndex, flashStage, kind, phase, sequenceMemoryStage, wordMemoryDuration]);
+  }, [flashDuration, flashIndex, flashStage, kind, memoryPalaceRounds, phase, sequenceMemoryStage, wordMemoryDuration]);
 
   useEffect(() => {
     if (phase !== "playing" || kind !== "sequence_memory" || !sequenceMemoryRound || sequenceMemoryStage !== "show") {
@@ -570,22 +590,39 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     setFlashCountdown(Math.ceil(flashDuration / 1000));
   };
 
-  const handleMemoryPalaceChoice = (choice: string) => {
-    if (phase !== "playing" || kind !== "memory_palace" || flashStage !== "choose") return;
-    if (choice === memoryPalaceRounds[flashIndex]?.location) {
-      correctRef.current += 1;
+  const handleMemoryPalaceDrop = (targetIndex: number) => {
+    if (
+      phase !== "playing" ||
+      kind !== "memory_palace" ||
+      flashStage !== "choose" ||
+      !memoryPalaceDragged ||
+      memoryPalacePlaced[targetIndex]
+    ) return;
+
+    const round = memoryPalaceRounds[flashIndex];
+    if (!round) return;
+    const nextPlaced = [...memoryPalacePlaced];
+    nextPlaced[targetIndex] = memoryPalaceDragged;
+    setMemoryPalacePlaced(nextPlaced);
+    setMemoryPalaceDragged(null);
+
+    if (nextPlaced.every(Boolean)) {
+      const correct = nextPlaced.reduce(
+        (count, word, index) => count + (word === round.words[index] ? 1 : 0),
+        0
+      );
+      correctRef.current += correct === round.words.length ? 1 : 0;
+      wrongRef.current += correct === round.words.length ? 0 : 1;
       setCorrectAnswers(correctRef.current);
-    } else {
-      wrongRef.current += 1;
+      const next = flashIndex + 1;
+      if (next >= memoryPalaceRounds.length) {
+        finish(correctRef.current, wrongRef.current, memoryPalaceRounds.length);
+        return;
+      }
+      setFlashIndex(next);
+      setFlashStage("show");
+      setFlashCountdown(MEMORY_PALACE_ROUNDS[next].duration);
     }
-    const next = flashIndex + 1;
-    if (next >= memoryPalaceRounds.length) {
-      finish(correctRef.current, wrongRef.current, memoryPalaceRounds.length);
-      return;
-    }
-    setFlashIndex(next);
-    setFlashStage("show");
-    setFlashCountdown(5);
   };
 
   const handleMatchingCardClick = (index: number) => {
@@ -953,24 +990,61 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
 
         {phase === "playing" && kind === "memory_palace" && memoryPalaceRounds[flashIndex] && (
           <div className="space-y-4 rounded-xl bg-ivory-warm p-6 text-center">
+            <p className="text-xs font-semibold text-charcoal-muted">
+              Tur {flashIndex + 1}/{memoryPalaceRounds.length} · {memoryPalaceRounds[flashIndex].rows}×{memoryPalaceRounds[flashIndex].columns}
+            </p>
             {flashStage === "show" ? (
               <>
-                <p className="text-sm font-semibold text-charcoal">Bu nesneyi ve bulunduğu konumu hatırlayın:</p>
-                <div className="flex min-h-36 flex-col items-center justify-center rounded-xl border border-amber-200 bg-white">
-                  <span className="text-4xl">●</span>
-                  <strong className="mt-2 text-2xl text-brand-900">{memoryPalaceRounds[flashIndex].object}</strong>
+                <p className="text-sm font-semibold text-charcoal">Kelimeleri ve tabloda bulundukları yerleri hatırlayın:</p>
+                <div
+                  className="mx-auto grid max-w-lg gap-2"
+                  style={{ gridTemplateColumns: `repeat(${memoryPalaceRounds[flashIndex].columns}, minmax(0, 1fr))` }}
+                  aria-label="Hatırlanacak kelime tablosu"
+                >
+                  {memoryPalaceRounds[flashIndex].words.map((word) => (
+                    <div key={word} className="flex min-h-16 items-center justify-center rounded-lg border border-amber-200 bg-white px-2 py-3 text-sm font-bold text-brand-900 sm:text-base">
+                      {word}
+                    </div>
+                  ))}
                 </div>
-                <p className="text-sm text-charcoal-muted">Konum: <strong>{memoryPalaceRounds[flashIndex].location}</strong></p>
                 <span className="inline-block rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-sm font-bold tabular-nums text-amber-900" aria-live="polite">
                   {flashCountdown} sn
                 </span>
               </>
             ) : (
               <>
-                <p className="text-sm font-semibold text-charcoal">Bu nesne hangi konumdaydı?</p>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {memoryPalaceRounds[flashIndex].choices.map((choice) => (
-                    <Button key={choice} variant="outline" onClick={() => handleMemoryPalaceChoice(choice)}>{choice}</Button>
+                <p className="text-sm font-semibold text-charcoal">Kelimeleri doğru hücrelere sürükleyin:</p>
+                <div
+                  className="mx-auto grid max-w-lg gap-2"
+                  style={{ gridTemplateColumns: `repeat(${memoryPalaceRounds[flashIndex].columns}, minmax(0, 1fr))` }}
+                  aria-label="Kelimelerin bırakılacağı tablo"
+                >
+                  {memoryPalacePlaced.map((word, index) => (
+                    <div
+                      key={index}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={() => handleMemoryPalaceDrop(index)}
+                      className="flex min-h-16 items-center justify-center rounded-lg border-2 border-dashed border-sage-300 bg-white px-2 py-3 text-sm font-bold text-brand-900"
+                    >
+                      {word || "Buraya bırakın"}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex flex-wrap justify-center gap-2" aria-label="Sürüklenecek kelimeler">
+                  {memoryPalaceRounds[flashIndex].words
+                    .filter((word) => !memoryPalacePlaced.includes(word))
+                    .sort()
+                    .map((word) => (
+                    <button
+                      key={word}
+                      type="button"
+                      draggable
+                      onDragStart={() => setMemoryPalaceDragged(word)}
+                      onDragEnd={() => setMemoryPalaceDragged(null)}
+                      className="cursor-grab rounded-lg border border-brand-200 bg-white px-3 py-2 text-sm font-semibold text-brand-900 shadow-sm active:cursor-grabbing"
+                    >
+                      {word}
+                    </button>
                   ))}
                 </div>
               </>

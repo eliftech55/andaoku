@@ -105,7 +105,7 @@ const EXERCISES: Record<
   memory_palace: {
     title: "Hafıza Sarayı",
     description: "Kelimeleri ve nesneleri konumlarıyla ilişkilendirme çalışması.",
-    instructions: "Konumlarda görünen nesneleri hatırlayın ve sorulan konumla eşleştirin.",
+    instructions: "Kelimeleri tabloda gösterildiği yerleriyle hatırlayın; süre bitince kelimeleri doğru hücrelere sürükleyin.",
     targetSymbol: "",
   },
   n_back: {
