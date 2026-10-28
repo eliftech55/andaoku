@@ -22,8 +22,7 @@ interface ChunkRound {
 
 interface PassageMemoryRound {
   passage: string;
-  correctAnswer: string;
-  choices: string[];
+  pieces: string[];
 }
 
 interface ExerciseRunnerProps {
@@ -164,6 +163,8 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   const [flashWordRounds, setFlashWordRounds] = useState<FlashWordRound[]>([]);
   const [chunkRounds, setChunkRounds] = useState<ChunkRound[]>([]);
   const [passageMemoryRounds, setPassageMemoryRounds] = useState<PassageMemoryRound[]>([]);
+  const [passageMemoryPlaced, setPassageMemoryPlaced] = useState<(string | null)[]>([]);
+  const [passageMemoryDragged, setPassageMemoryDragged] = useState<string | null>(null);
   const [wordMemoryRounds, setWordMemoryRounds] = useState<WordMemoryRound[]>([]);
   const [memoryPalaceRounds, setMemoryPalaceRounds] = useState<MemoryPalaceRound[]>([]);
   const [memoryPalacePlaced, setMemoryPalacePlaced] = useState<(string | null)[]>([]);
@@ -242,6 +243,8 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     setFlashIndex(0);
     setChunkRounds([]);
     setPassageMemoryRounds([]);
+    setPassageMemoryPlaced([]);
+    setPassageMemoryDragged(null);
     setMatchingCards([]);
     setMatchingFirst(null);
     setMatchingBusy(false);
@@ -404,22 +407,19 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       setFlashCountdown(Math.ceil(flashDuration / 1000));
     } else if (kind === "passage_memory") {
       const passages = [
-        "Düzenli okuma, kelime dağarcığını geliştirir ve bilgiyi daha kolay hatırlamayı sağlar.",
-        "Arılar çiçeklerden nektar toplar ve bitkilerin tozlaşmasına yardımcı olur.",
-        "Su döngüsünde güneş, suyun buharlaşmasını ve bulutların oluşmasını sağlar.",
-        "Kütüphaneler, farklı konularda bilgi edinmek isteyen herkes için önemli kaynaklardır.",
-        "Bir hedefe ulaşmak için plan yapmak ve küçük adımlarla ilerlemek önemlidir.",
+        "Düzenli okuma, kelime dağarcığını geliştirir. Yeni kelimeler, metinleri anlamayı kolaylaştırır. Bu alışkanlık bilgiyi daha kolay hatırlamayı sağlar.",
+        "Arılar çiçeklerden nektar toplar. Bu sırada bitkilerin tozlaşmasına yardımcı olurlar. Böylece birçok bitkinin üremesine katkı sağlarlar.",
+        "Su döngüsünde güneş, suyun buharlaşmasını sağlar. Buhar yükselerek bulutları oluşturur. Yağışla birlikte su yeniden yeryüzüne döner.",
+        "Kütüphaneler farklı konularda bilgi edinmek isteyenler için önemli kaynaklardır. Kitaplar düzenli biçimde sınıflandırılır. Sessiz ortam, okuyucuların dikkatini korumasına yardımcı olur.",
+        "Bir hedefe ulaşmak için önce plan yapmak gerekir. Küçük adımlarla ilerlemek süreci kolaylaştırır. Düzenli çaba, başarıya ulaşma olasılığını artırır.",
       ];
-      const rounds = passages.map((passage, index) => {
-        const correct = passage.split(" ").slice(0, 3).join(" ");
-        const distractors = [
-          passage.split(" ").slice(-3).join(" "),
-          `${index % 2 === 0 ? "Düzenli" : "Doğal"} çalışmalar yeni bilgiler kazandırır.`,
-          "Bu bilgi metinde yer almamaktadır.",
-        ];
-        return { passage, correctAnswer: correct, choices: shuffled([correct, ...distractors]) };
+      const rounds = passages.map((passage) => {
+        const sentences = passage.match(/[^.!?]+[.!?]+/g) || [passage];
+        return { passage, pieces: sentences.map((sentence) => sentence.trim()) };
       });
       setPassageMemoryRounds(rounds);
+      setPassageMemoryPlaced([]);
+      setPassageMemoryDragged(null);
       setFlashIndex(0);
       setFlashStage("show");
       setFlashCountdown(Math.ceil(flashDuration / 1000));
@@ -472,6 +472,8 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       if (remaining <= 0) {
         if (kind === "memory_palace") {
           setMemoryPalacePlaced(Array(memoryPalaceRounds[flashIndex]?.words.length ?? 0).fill(null));
+        } else if (kind === "passage_memory") {
+          setPassageMemoryPlaced(Array(passageMemoryRounds[flashIndex]?.pieces.length ?? 0).fill(null));
         }
         setFlashStage("choose");
       }
@@ -598,23 +600,39 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     setFlashCountdown(Math.ceil(flashDuration / 1000));
   };
 
-  const handlePassageMemoryChoice = (choice: string) => {
-    if (phase !== "playing" || kind !== "passage_memory" || flashStage !== "choose") return;
+  const handlePassageMemoryDrop = (targetIndex: number) => {
+    if (
+      phase !== "playing" ||
+      kind !== "passage_memory" ||
+      flashStage !== "choose" ||
+      !passageMemoryDragged ||
+      passageMemoryPlaced[targetIndex]
+    ) return;
+
     const round = passageMemoryRounds[flashIndex];
-    if (choice === round?.correctAnswer) {
-      correctRef.current += 1;
-      setCorrectAnswers(correctRef.current);
-    } else {
-      wrongRef.current += 1;
+    if (!round) return;
+    const nextPlaced = [...passageMemoryPlaced];
+    nextPlaced[targetIndex] = passageMemoryDragged;
+    setPassageMemoryPlaced(nextPlaced);
+    setPassageMemoryDragged(null);
+
+    if (nextPlaced.every(Boolean)) {
+      const correct = nextPlaced.every((piece, index) => piece === round.pieces[index]);
+      if (correct) {
+        correctRef.current += 1;
+        setCorrectAnswers(correctRef.current);
+      } else {
+        wrongRef.current += 1;
+      }
+      const next = flashIndex + 1;
+      if (next >= passageMemoryRounds.length) {
+        finish(correctRef.current, wrongRef.current, passageMemoryRounds.length);
+        return;
+      }
+      setFlashIndex(next);
+      setFlashStage("show");
+      setFlashCountdown(Math.ceil(flashDuration / 1000));
     }
-    const next = flashIndex + 1;
-    if (next >= passageMemoryRounds.length) {
-      finish(correctRef.current, wrongRef.current, passageMemoryRounds.length);
-      return;
-    }
-    setFlashIndex(next);
-    setFlashStage("show");
-    setFlashCountdown(Math.ceil(flashDuration / 1000));
   };
 
   const handleMemoryPalaceDrop = (targetIndex: number) => {
@@ -865,11 +883,18 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
 
         {phase === "playing" && kind === "passage_memory" && passageMemoryRounds[flashIndex] && (
           <div className="space-y-4 rounded-xl bg-ivory-warm p-6 text-center">
+            <p className="text-xs font-semibold text-charcoal-muted">
+              Tur {flashIndex + 1}/{passageMemoryRounds.length}
+            </p>
             {flashStage === "show" ? (
               <>
-                <p className="text-sm font-semibold text-charcoal">Metni dikkatle okuyun ve ana bilgiyi hatırlayın.</p>
-                <div className="flex min-h-36 items-center justify-center rounded-xl border border-amber-200 bg-white p-5 text-left text-base leading-relaxed text-brand-900">
-                  {passageMemoryRounds[flashIndex].passage}
+                <p className="text-sm font-semibold text-charcoal">Parçaları ve doğru sıralarını hatırlayın.</p>
+                <div className="space-y-2 text-left">
+                  {passageMemoryRounds[flashIndex].pieces.map((piece, index) => (
+                    <div key={piece} className="rounded-lg border border-amber-200 bg-white p-3 text-sm leading-relaxed text-brand-900">
+                      {index + 1}. {piece}
+                    </div>
+                  ))}
                 </div>
                 <span className="inline-block rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-sm font-bold tabular-nums text-amber-900" aria-live="polite">
                   {flashCountdown} sn
@@ -877,13 +902,35 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
               </>
             ) : (
               <>
-                <p className="text-sm font-semibold text-charcoal">Metinde geçen ana bilgi hangisiydi?</p>
-                <div className="grid gap-3">
-                  {passageMemoryRounds[flashIndex].choices.map((choice) => (
-                    <Button key={choice} variant="outline" onClick={() => handlePassageMemoryChoice(choice)}>
-                      {choice}
-                    </Button>
+                <p className="text-sm font-semibold text-charcoal">Parçaları doğru sıraya sürükleyin:</p>
+                <div className="space-y-2 text-left">
+                  {passageMemoryPlaced.map((piece, index) => (
+                    <div
+                      key={index}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={() => handlePassageMemoryDrop(index)}
+                      className="min-h-14 rounded-lg border-2 border-dashed border-sage-300 bg-white p-3 text-sm text-brand-900"
+                    >
+                      {piece ? `${index + 1}. ${piece}` : `${index + 1}. Buraya bırakın`}
+                    </div>
                   ))}
+                </div>
+                <div className="flex flex-col gap-2 text-left">
+                  {passageMemoryRounds[flashIndex].pieces
+                    .filter((piece) => !passageMemoryPlaced.includes(piece))
+                    .sort()
+                    .map((piece) => (
+                      <button
+                        key={piece}
+                        type="button"
+                        draggable
+                        onDragStart={() => setPassageMemoryDragged(piece)}
+                        onDragEnd={() => setPassageMemoryDragged(null)}
+                        className="cursor-grab rounded-lg border border-brand-200 bg-white p-3 text-sm font-semibold text-brand-900 shadow-sm active:cursor-grabbing"
+                      >
+                        {piece}
+                      </button>
+                    ))}
                 </div>
               </>
             )}

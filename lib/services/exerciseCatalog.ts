@@ -99,7 +99,7 @@ const EXERCISES: Record<
   passage_memory: {
     title: "Metin Parçası Hatırlama",
     description: "Farklı kısa metinleri okuyup ana bilgileri hatırlama çalışması.",
-    instructions: "Metni dikkatle okuyun; gizlendikten sonra soruları yanıtlayın.",
+    instructions: "Metin parçalarını ve doğru sıralarını hatırlayın; parçalar gizlendikten sonra doğru sıraya sürükleyin.",
     targetSymbol: "",
   },
   memory_palace: {
