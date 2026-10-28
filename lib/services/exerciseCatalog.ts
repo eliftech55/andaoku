@@ -37,15 +37,15 @@ const EXERCISES: Record<
     targetSymbol: "",
   },
   point_tracking: {
-    title: "Nokta Takibi",
-    description: "Hareket eden noktayı başınızı oynatmadan gözlerinizle takip etme çalışması.",
-    instructions: "Merkezdeki noktayı yalnızca gözlerinizle takip edin ve yön değişimlerine odaklanın.",
-    targetSymbol: "●",
+    title: "Schulte Tablosu",
+    description: "Türk alfabesindeki harfleri sırayla bularak görsel tarama ve odaklanma çalışması.",
+    instructions: "Tablodaki Türkçe harfleri Türk alfabesi sırasına göre (A, B, C, Ç, D, ...) süre bitmeden seçin.",
+    targetSymbol: "",
   },
   infinity_tracking: {
-    title: "Sekiz Takibi",
-    description: "Sonsuz işareti üzerinde hareket eden noktayı akıcı biçimde takip etme çalışması.",
-    instructions: "Hareket eden noktayı gözlerinizle izleyin; başınızı sabit tutun.",
+    title: "Labirent Takibi",
+    description: "Daireyi dairesel ve labirent benzeri bir yol üzerinde doğru sırayla ilerletme çalışması.",
+    instructions: "Daireyi sıradaki yol noktasına tıklayarak aynı patikada ilerletin. Yanlış seçimler hata sayılır; seviyeler ilerledikçe yol uzar.",
     targetSymbol: "●",
   },
   chunk_reading: {
@@ -62,8 +62,8 @@ const EXERCISES: Record<
   },
   schulte_table: {
     title: "Schulte Tablosu",
-    description: "Sayıları sırayla bularak görsel tarama ve odaklanma çalışması.",
-    instructions: "Tablodaki sayıları 1’den başlayarak mümkün olduğunca hızlı ve doğru sırayla seçin.",
+    description: "Türk alfabesindeki harfleri sırayla bularak görsel tarama ve odaklanma çalışması.",
+    instructions: "Tablodaki Türkçe harfleri Türk alfabesi sırasına göre (A, B, C, Ç, D, ...) süre bitmeden seçin.",
     targetSymbol: "",
   },
   regression_prevention: {
@@ -137,7 +137,7 @@ export const BUILT_IN_EXERCISE_DEFINITIONS: ExerciseDefinition[] = (
       config: {
         gridSize: level.gridSize,
         targetCount: level.targetCount,
-        timeLimitSeconds: level.seconds,
+        timeLimitSeconds: kind === "memory_palace" ? 75 : level.seconds,
         sequenceLength: level.sequenceLength,
         flashDurationMs: level.flashDurationMs,
         targetSymbol: exercise.targetSymbol,

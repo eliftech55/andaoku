@@ -64,6 +64,25 @@ interface SequenceMemoryRound {
   choices: number[];
 }
 
+interface DigitMemoryRound {
+  sequence: number[];
+}
+
+interface PacerRound {
+  lines: string[];
+}
+
+interface NBackRound {
+  sequence: string[];
+  n: number;
+}
+
+interface VisualChangeRound {
+  before: string[];
+  after: string[];
+  changedIndex: number;
+}
+
 const DISTRACTORS: Record<ExerciseKind, string[]> = {
   peripheral_vision: ["▲", "■", "◆", "✦", "●", "○"],
   target_scan: ["R", "H", "K", "4", "Λ", "A"],
@@ -96,16 +115,11 @@ function shuffled<T>(items: T[]): T[] {
 const FLASH_LIKE_KINDS: ExerciseKind[] = [
   "flash_words",
   "chunk_reading",
-  "pacer_reading",
-  "regression_prevention",
-  "digit_memory",
   "word_memory",
   "matching_cards",
   "sequence_memory",
   "passage_memory",
   "memory_palace",
-  "n_back",
-  "visual_change",
 ];
 
 const FLASH_WORD_DURATIONS = [6000, 5500, 5000, 4500, 4000];
@@ -114,12 +128,13 @@ const WORD_MEMORY_DURATIONS = [10000, 9000, 8500, 8000, 7500];
 const WORD_MEMORY_COUNTS = [4, 5, 6, 7, 8];
 const EXERCISE_ROUND_COUNT = 5;
 const MEMORY_PALACE_LEVELS = [
-  { rows: 2, columns: 2, duration: 5 },
-  { rows: 2, columns: 3, duration: 5 },
-  { rows: 3, columns: 3, duration: 5 },
-  { rows: 3, columns: 3, duration: 5 },
-  { rows: 3, columns: 3, duration: 5 },
+  { rows: 2, columns: 2, duration: 15 },
+  { rows: 2, columns: 3, duration: 15 },
+  { rows: 3, columns: 3, duration: 15 },
+  { rows: 3, columns: 3, duration: 15 },
+  { rows: 3, columns: 3, duration: 15 },
 ] as const;
+const TURKISH_ALPHABET = ["A", "B", "C", "Ç", "D", "E", "F", "G", "Ğ", "H", "I", "İ", "J", "K", "L", "M", "N", "O", "Ö", "P", "R", "S", "Ş", "T", "U", "Ü", "V", "Y", "Z"];
 
 export function ExerciseRunner({ activity, onComplete, nextActivityHref }: ExerciseRunnerProps) {
   const kind = activity.type as ExerciseKind;
@@ -134,7 +149,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     ? 75
     : Math.min(
       180,
-      Math.max(["word_memory", "passage_memory"].includes(kind) ? 75 : 10, activity.contentConfig.timeLimitSeconds || 60)
+      Math.max(["word_memory", "passage_memory", "memory_palace"].includes(kind) ? 75 : 10, activity.contentConfig.timeLimitSeconds || 60)
     );
   const sequenceLength = Math.min(20, Math.max(3, activity.contentConfig.sequenceLength || 4));
   const flashDuration = kind === "flash_words"
@@ -179,7 +194,16 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   const [sequenceMemoryInput, setSequenceMemoryInput] = useState<number[]>([]);
   const [sequenceMemoryStage, setSequenceMemoryStage] = useState<"show" | "choose">("show");
   const [sequenceMemoryVisibleCount, setSequenceMemoryVisibleCount] = useState(0);
-  const [schulteExpected, setSchulteExpected] = useState(1);
+  const [digitMemoryRounds, setDigitMemoryRounds] = useState<DigitMemoryRound[]>([]);
+  const [digitMemoryInput, setDigitMemoryInput] = useState<number[]>([]);
+  const [pacerRounds, setPacerRounds] = useState<PacerRound[]>([]);
+  const [pacerWordIndex, setPacerWordIndex] = useState(0);
+  const [nBackRound, setNBackRound] = useState<NBackRound | null>(null);
+  const [nBackIndex, setNBackIndex] = useState(0);
+  const [visualChangeRound, setVisualChangeRound] = useState<VisualChangeRound | null>(null);
+  const [mazePath, setMazePath] = useState<{ x: number; y: number }[]>([]);
+  const [mazeStep, setMazeStep] = useState(0);
+  const [schulteExpected, setSchulteExpected] = useState("A");
   const [flashIndex, setFlashIndex] = useState(0);
   const [flashStage, setFlashStage] = useState<"show" | "choose">("show");
   const [flashCountdown, setFlashCountdown] = useState(0);
@@ -232,6 +256,8 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
         ? sequenceLength
         : ["matching_cards", "point_tracking"].includes(kind)
           ? EXERCISE_ROUND_COUNT
+          : ["pacer_reading", "regression_prevention", "digit_memory", "n_back", "visual_change", "infinity_tracking"].includes(kind)
+            ? EXERCISE_ROUND_COUNT
           : kind === "memory_palace"
             ? memoryPalaceRoundConfig.length
             : kind === "schulte_table"
@@ -260,7 +286,16 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     setSequenceMemoryInput([]);
     setSequenceMemoryStage("show");
     setSequenceMemoryVisibleCount(0);
-    setSchulteExpected(1);
+    setDigitMemoryRounds([]);
+    setDigitMemoryInput([]);
+    setPacerRounds([]);
+    setPacerWordIndex(0);
+    setNBackRound(null);
+    setNBackIndex(0);
+    setVisualChangeRound(null);
+    setMazePath([]);
+    setMazeStep(0);
+    setSchulteExpected("A");
     setTimeLeft(durationLimit);
     startedAt.current = Date.now();
 
@@ -283,10 +318,10 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       setWrongCells([]);
     } else if (kind === "schulte_table") {
       const cellCount = schulteGridSize * schulteGridSize;
-      setGrid(shuffled(Array.from({ length: cellCount }, (_, index) => String(index + 1))));
+      setGrid(shuffled(TURKISH_ALPHABET.slice(0, cellCount)));
       setSelectedCells([]);
       setWrongCells([]);
-      setSchulteExpected(1);
+      setSchulteExpected(TURKISH_ALPHABET[0]);
     } else if (kind === "eye_saccade") {
       const positions = shuffled(Array.from({ length: 9 }, (_, index) => index));
       setSequence(positions.slice(0, Math.min(sequenceLength, positions.length)));
@@ -416,14 +451,108 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       setFlashIndex(0);
       setFlashStage("show");
       setFlashCountdown(Math.ceil(flashDuration / 1000));
-    } else if (kind === "passage_memory") {
-      const passages = [
-        "Düzenli okuma, kelime dağarcığını geliştirir. Yeni kelimeler, metinleri anlamayı kolaylaştırır. Bu alışkanlık bilgiyi daha kolay hatırlamayı sağlar.",
-        "Arılar çiçeklerden nektar toplar. Bu sırada bitkilerin tozlaşmasına yardımcı olurlar. Böylece birçok bitkinin üremesine katkı sağlarlar.",
-        "Su döngüsünde güneş, suyun buharlaşmasını sağlar. Buhar yükselerek bulutları oluşturur. Yağışla birlikte su yeniden yeryüzüne döner.",
-        "Kütüphaneler farklı konularda bilgi edinmek isteyenler için önemli kaynaklardır. Kitaplar düzenli biçimde sınıflandırılır. Sessiz ortam, okuyucuların dikkatini korumasına yardımcı olur.",
-        "Bir hedefe ulaşmak için önce plan yapmak gerekir. Küçük adımlarla ilerlemek süreci kolaylaştırır. Düzenli çaba, başarıya ulaşma olasılığını artırır.",
+    } else if (kind === "digit_memory") {
+      const levelIdx = Math.min(5, Math.max(1, activity.level || 1)) - 1;
+      const sequencesByLevel = [
+        // Level 1 (length 3)
+        [[1,2,3],[4,5,6],[7,8,9]],
+        // Level 2 (length 5)
+        [[1,2,3,4,5],[6,7,8,9,0]],
+        // Level 3 (length 7)
+        [[1,2,3,4,5,6,7],[8,9,0,1,2,3,4]],
+        // Level 4 (length 9)
+        [[1,2,3,4,5,6,7,8,9],[0,1,2,3,4,5,6,7,8]],
+        // Level 5 (length 12)
+        [[1,2,3,4,5,6,7,8,9,0,1,2],[3,4,5,6,7,8,9,0,1,2,3,4]],
       ];
+      const possible = sequencesByLevel[levelIdx];
+      const rounds = Array.from({ length: EXERCISE_ROUND_COUNT }, () => ({
+        sequence: possible[Math.floor(Math.random() * possible.length)],
+      }));
+      setDigitMemoryRounds(rounds);
+      setDigitMemoryInput([]);
+      setFlashIndex(0);
+      setFlashStage("show");
+      setFlashCountdown(Math.max(2, 7 - (activity.level || 1)));
+    } else if (kind === "pacer_reading" || kind === "regression_prevention") {
+      const source = kind === "pacer_reading"
+        ? [
+          "Düzenli okuma dikkati güçlendirir ve anlamayı kolaylaştırır.",
+          "Bakışınızı satır boyunca akıcı biçimde ilerletin.",
+          "Her satırı tamamladığınızda bir sonraki satıra geçin.",
+        ]
+        : [
+          "İleriye doğru okurken anlamı korumaya odaklanın.",
+          "Geride kalan kelimelere dönmeden cümleyi tamamlayın.",
+          "Akıcı ilerlemek okuma hızını ve güvenini artırır.",
+        ];
+      const rounds = Array.from({ length: EXERCISE_ROUND_COUNT }, (_, round) => ({
+        lines: source[(round + (activity.level || 1) - 1) % source.length].split(" "),
+      }));
+      setPacerRounds(rounds);
+      setPacerWordIndex(0);
+      setFlashIndex(0);
+    } else if (kind === "n_back") {
+      const n = Math.min(3, Math.max(1, activity.level || 1));
+      const sequence = Array.from({ length: 8 + n }, () => DISTRACTORS.n_back[Math.floor(Math.random() * DISTRACTORS.n_back.length)]);
+      setNBackRound({ sequence, n });
+      setNBackIndex(0);
+    } else if (kind === "visual_change") {
+      const size = Math.min(16, 6 + (activity.level || 1) * 2);
+      const before = Array.from({ length: size }, () => DISTRACTORS.visual_change[Math.floor(Math.random() * DISTRACTORS.visual_change.length)]);
+      const changedIndex = Math.floor(Math.random() * size);
+      const after = [...before];
+      const alternatives = DISTRACTORS.visual_change.filter((item) => item !== before[changedIndex]);
+      after[changedIndex] = alternatives[Math.floor(Math.random() * alternatives.length)];
+      setVisualChangeRound({ before, after, changedIndex });
+    } else if (kind === "infinity_tracking") {
+      const pointCount = 8 + Math.max(0, (activity.level || 1) - 1) * 2;
+      const path = Array.from({ length: pointCount }, (_, index) => {
+        const angle = (index / pointCount) * Math.PI * 2;
+        const radius = index % 2 === 0 ? 105 : 55;
+        return { x: 180 + Math.cos(angle) * radius, y: 100 + Math.sin(angle) * radius };
+      });
+      setMazePath(path);
+      setMazeStep(0);
+    } else if (kind === "passage_memory") {
+      const passageSets = [
+        [
+          "Kıyıdaki fener, geceleri gemilere güvenli yolu gösterir. Bekçi her akşam ışığı kontrol eder. Bu düzenli bakım denizcilerin işini kolaylaştırır.",
+          "Bir tohum toprağa düşünce su ve güneşle filizlenir. Kökler aşağıya, gövde yukarıya doğru büyür. Zamanla küçük bitki güçlenir.",
+          "Müzede eski haritalar sergilenir. Ziyaretçiler bu haritalarla şehirlerin nasıl değiştiğini karşılaştırır. Tarihi belgeler geçmişi anlamaya yardım eder.",
+          "Bisiklet sürmek için denge ve dikkat gerekir. Kask takmak güvenliği artırır. Düzenli pratik hareketleri daha akıcı yapar.",
+          "Kışın kuşlar yiyecek bulmakta zorlanır. Bahçeye bırakılan yemler onlara destek olur. Temiz su da kuşların sağlığı için önemlidir.",
+        ],
+        [
+          "Düzenli okuma, kelime dağarcığını geliştirir. Yeni kelimeler metinleri anlamayı kolaylaştırır. Bu alışkanlık bilgiyi daha kolay hatırlamayı sağlar.",
+          "Arılar çiçeklerden nektar toplar. Bu sırada bitkilerin tozlaşmasına yardım ederler. Böylece birçok bitkinin üremesine katkı sağlarlar.",
+          "Su döngüsünde güneş suyun buharlaşmasını sağlar. Buhar yükselerek bulutları oluşturur. Yağışla birlikte su yeniden yeryüzüne döner.",
+          "Kütüphaneler bilgi edinmek isteyenler için önemli kaynaklardır. Kitaplar düzenli biçimde sınıflandırılır. Sessiz ortam dikkati korur.",
+          "Bir hedefe ulaşmak için önce plan yapmak gerekir. Küçük adımlarla ilerlemek süreci kolaylaştırır. Düzenli çaba başarı olasılığını artırır.",
+        ],
+        [
+          "Dağların yüksek kesimlerinde hava daha serindir. Kar eriyince dereler beslenir. Bu sular vadilerdeki yaşamı destekler.",
+          "Rüzgâr türbinleri hareket eden havanın gücünü kullanır. Kanatlar döndükçe jeneratör çalışır. Böylece elektrik üretilebilir.",
+          "Arkeologlar kazı alanında dikkatle çalışır. Buldukları parçaları numaralandırıp kaydederler. Bu yöntem geçmiş hakkında güvenilir bilgi sağlar.",
+          "Bir takımın başarısı iletişime bağlıdır. Üyeler görevlerini paylaşır ve birbirini dinler. Ortak hedef çalışmayı kolaylaştırır.",
+          "Uyku sırasında beyin gün içinde öğrenilenleri düzenler. Yeterli dinlenme dikkati artırır. Bu nedenle düzenli uyku öğrenmenin bir parçasıdır.",
+        ],
+        [
+          "Mercan resifleri çok sayıda canlıya barınak sağlar. Sıcaklık değişimleri bu hassas ekosistemi etkileyebilir. Denizleri korumak canlı çeşitliliğini sürdürür.",
+          "Geri dönüşüm atıkların yeniden kullanılmasını sağlar. Kâğıt, cam ve metal ayrı toplanır. Doğru ayırma doğal kaynakların korunmasına yardım eder.",
+          "Bir deneyde değişkenleri kontrol etmek önemlidir. Gözlemler düzenli biçimde yazılır. Sonuçlar tekrarlandığında daha güvenilir olur.",
+          "Şehir planlamasında yeşil alanlar nefes alma imkânı sunar. Ağaçlar gölge ve serinlik sağlar. Parklar insanların dinlenmesine yardımcı olur.",
+          "Ses dalgaları titreşimlerle yayılır. Farklı maddeler sesi farklı hızlarda iletir. Kulak bu titreşimleri sinyallere dönüştürür.",
+        ],
+        [
+          "Uzun bir yolculuk öncesi harita ve hava durumu incelenir. Gerekli eşyalar listeye göre hazırlanır. Planlı hareket etmek beklenmedik durumları azaltır.",
+          "Bir araştırmacı önce sorusunu açıkça belirler. Kaynakları karşılaştırır ve kanıtları değerlendirir. Böylece sağlam bir sonuca ulaşabilir.",
+          "Ormanlar karbonu depolar ve havayı temizler. Farklı ağaç türleri birçok canlıya yuva olur. Ormanları korumak iklim için de önemlidir.",
+          "Yeni bir beceri öğrenirken hatalar doğal bir basamaktır. Geri bildirim veren kişi eksikleri gösterir. Sabırlı tekrar gelişimi hızlandırır.",
+          "Güneş panelleri ışığı elektrik enerjisine çevirir. Panellerin yönü verimi etkiler. Temiz enerji kullanımı çevreye katkı sağlar.",
+        ],
+      ];
+      const passages = passageSets[Math.min(5, Math.max(1, activity.level || 1)) - 1];
       const rounds = passages.map((passage) => {
         const sentences = passage.match(/[^.!?]+[.!?]+/g) || [passage];
         return { passage, pieces: sentences.map((sentence) => sentence.trim()) };
@@ -451,10 +580,10 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
 
   useEffect(() => {
     if (phase !== "playing" || kind !== "memory_palace" || flashStage !== "show") return;
-    const duration = 5000;
+    const duration = (memoryPalaceRoundConfig[flashIndex]?.duration ?? 15) * 1000;
     const deadline = Date.now() + duration;
     flashDeadlineRef.current = deadline;
-    setFlashCountdown(5);
+    setFlashCountdown(Math.ceil(duration / 1000));
     const countdownTimer = window.setInterval(() => {
       setFlashCountdown(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)));
     }, 100);
@@ -468,12 +597,14 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       window.clearTimeout(finishTimer);
       if (flashDeadlineRef.current === deadline) flashDeadlineRef.current = null;
     };
-  }, [flashIndex, flashStage, kind, memoryPalaceRounds, phase]);
+  }, [flashIndex, flashStage, kind, memoryPalaceRoundConfig, memoryPalaceRounds, phase]);
 
   useEffect(() => {
-    if (phase !== "playing" || !["flash_words", "word_memory", "chunk_reading", "passage_memory"].includes(kind) || flashStage !== "show") return;
+    if (phase !== "playing" || !["flash_words", "word_memory", "chunk_reading", "passage_memory", "digit_memory"].includes(kind) || flashStage !== "show") return;
     const displayDuration = kind === "word_memory"
       ? wordMemoryDuration
+      : kind === "digit_memory"
+        ? Math.max(2000, (7 - (activity.level || 1)) * 1000)
       : flashDuration;
     const deadline = Date.now() + displayDuration;
     flashDeadlineRef.current = deadline;
@@ -485,6 +616,8 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
           setMemoryPalacePlaced(Array(memoryPalaceRounds[flashIndex]?.words.length ?? 0).fill(null));
         } else if (kind === "passage_memory") {
           setPassageMemoryPlaced(Array(passageMemoryRounds[flashIndex]?.pieces.length ?? 0).fill(null));
+        } else if (kind === "digit_memory") {
+          setDigitMemoryInput([]);
         }
         setFlashStage("choose");
       }
@@ -495,7 +628,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       window.clearInterval(timer);
       if (flashDeadlineRef.current === deadline) flashDeadlineRef.current = null;
     };
-  }, [flashDuration, flashIndex, flashStage, kind, memoryPalaceRounds, phase, sequenceMemoryStage, wordMemoryDuration]);
+  }, [activity.level, flashDuration, flashIndex, flashStage, kind, memoryPalaceRounds, passageMemoryRounds, phase, sequenceMemoryStage, wordMemoryDuration]);
 
   useEffect(() => {
     if (phase !== "playing" || kind !== "sequence_memory" || !sequenceMemoryRound || sequenceMemoryStage !== "show") {
@@ -545,7 +678,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
 
   const handleSchulteClick = (index: number) => {
     if (phase !== "playing" || kind !== "schulte_table") return;
-    const value = Number(grid[index]);
+    const value = grid[index];
     if (value !== schulteExpected) {
       wrongRef.current += 1;
       setWrongCells((current) => [...current, index]);
@@ -555,11 +688,12 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     setSelectedCells((current) => [...current, index]);
     correctRef.current += 1;
     setCorrectAnswers(correctRef.current);
-    if (value === grid.length) {
+    if (value === grid[grid.length - 1]) {
       finish(correctRef.current, wrongRef.current, grid.length);
       return;
     }
-    setSchulteExpected(value + 1);
+    const nextLetter = TURKISH_ALPHABET[TURKISH_ALPHABET.indexOf(value) + 1];
+    setSchulteExpected(nextLetter);
   };
 
   const handleSaccadeClick = (index: number) => {
@@ -587,6 +721,88 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       return;
     }
     setFlashIndex(next);
+  };
+
+  const completeRound = (correct: boolean, total = EXERCISE_ROUND_COUNT) => {
+    if (correct) {
+      correctRef.current += 1;
+      setCorrectAnswers(correctRef.current);
+    } else {
+      wrongRef.current += 1;
+    }
+    const next = flashIndex + 1;
+    if (next >= total) {
+      finish(correctRef.current, wrongRef.current, total);
+    } else {
+      setFlashIndex(next);
+    }
+  };
+
+  const handleDigitMemoryClick = (digit: number) => {
+    if (phase !== "playing" || kind !== "digit_memory" || flashStage !== "choose") return;
+    const next = [...digitMemoryInput, digit];
+    setDigitMemoryInput(next);
+    const expected = digitMemoryRounds[flashIndex]?.sequence ?? [];
+    if (digit !== expected[next.length - 1]) {
+      setFlashStage("show");
+      setFlashCountdown(Math.max(2, 7 - (activity.level || 1)));
+      completeRound(false);
+    } else if (next.length === expected.length) {
+      completeRound(true);
+      setFlashStage("show");
+      setFlashCountdown(Math.max(2, 7 - (activity.level || 1)));
+      setDigitMemoryInput([]);
+    }
+  };
+
+  const handlePacerClick = () => {
+    if (phase !== "playing" || !["pacer_reading", "regression_prevention"].includes(kind)) return;
+    const wordsInRound = pacerRounds[flashIndex]?.lines ?? [];
+    if (pacerWordIndex + 1 >= wordsInRound.length) {
+      completeRound(true);
+      setPacerWordIndex(0);
+    } else {
+      setPacerWordIndex((current) => current + 1);
+    }
+  };
+
+  const handleNBackAnswer = (matches: boolean) => {
+    if (phase !== "playing" || kind !== "n_back" || !nBackRound || nBackIndex < nBackRound.n) return;
+    const expected = nBackRound.sequence[nBackIndex] === nBackRound.sequence[nBackIndex - nBackRound.n];
+    if (matches === expected) correctRef.current += 1;
+    else wrongRef.current += 1;
+    setCorrectAnswers(correctRef.current);
+    const next = nBackIndex + 1;
+    if (next >= nBackRound.sequence.length) finish(correctRef.current, wrongRef.current, nBackRound.sequence.length - nBackRound.n);
+    else setNBackIndex(next);
+  };
+
+  const handleVisualChange = (index: number) => {
+    if (phase !== "playing" || kind !== "visual_change" || !visualChangeRound) return;
+    completeRound(index === visualChangeRound.changedIndex);
+    if (flashIndex + 1 < EXERCISE_ROUND_COUNT) {
+      const size = visualChangeRound.before.length;
+      const before = Array.from({ length: size }, () => DISTRACTORS.visual_change[Math.floor(Math.random() * DISTRACTORS.visual_change.length)]);
+      const changedIndex = Math.floor(Math.random() * size);
+      const after = [...before];
+      const alternatives = DISTRACTORS.visual_change.filter((item) => item !== before[changedIndex]);
+      after[changedIndex] = alternatives[Math.floor(Math.random() * alternatives.length)];
+      setVisualChangeRound({ before, after, changedIndex });
+    }
+  };
+
+  const handleMazeStep = (index: number) => {
+    if (phase !== "playing" || kind !== "infinity_tracking" || !mazePath.length) return;
+    if (index !== mazeStep) {
+      wrongRef.current += 1;
+      return;
+    }
+    if (mazeStep + 1 >= mazePath.length) {
+      completeRound(true);
+      setMazeStep(0);
+    } else {
+      setMazeStep((current) => current + 1);
+    }
   };
 
   const handleFlashChoice = (choice: string) => {
@@ -966,8 +1182,8 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
         {phase === "playing" && kind === "schulte_table" && (
           <div className="space-y-3">
             <div className="flex items-center justify-between text-sm text-charcoal-muted">
-              <span>Sıradaki sayı: <strong className="text-brand-900">{schulteExpected}</strong></span>
-              <span>{schulteExpected - 1}/{grid.length} doğru</span>
+              <span>Sıradaki harf: <strong className="text-brand-900">{schulteExpected}</strong></span>
+              <span>{selectedCells.length}/{grid.length} doğru</span>
             </div>
             <div
               className="grid gap-2 rounded-xl bg-ivory-warm p-3"
@@ -977,7 +1193,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
                 <button
                   key={index}
                   type="button"
-                  aria-label={`Schulte sayısı ${value}`}
+                  aria-label={`Schulte harfi ${value}`}
                   onClick={() => handleSchulteClick(index)}
                   disabled={selectedCells.includes(index)}
                   className={`aspect-square rounded-lg border text-xl font-bold ${
@@ -1039,21 +1255,21 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
           </div>
         )}
 
-        {phase === "playing" && kind === "infinity_tracking" && (
+        {phase === "playing" && kind === "infinity_tracking" && mazePath.length > 0 && (
           <div className="space-y-4 rounded-xl bg-ivory-warm p-6 text-center">
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-              <p className="font-semibold">Nasıl yapılır?</p>
-              <p className="mt-1">Hareket eden noktayı yalnızca gözlerinizle takip edin. Başınızı sabit tutun ve nokta turunu tamamladığında devam edin.</p>
+              <p className="font-semibold">Labirent yolunu takip edin</p>
+              <p className="mt-1">Daireyi sıradaki noktaya tıklayarak aynı yolu izletin. Yanlış noktaya tıklamak hata sayılır; seviyeler ilerledikçe yol uzar.</p>
             </div>
-            <svg viewBox="0 0 360 180" className="mx-auto h-52 w-full max-w-lg" role="img" aria-label="Sekiz şekli üzerinde hareket eden nokta">
-              <path d="M180 90 C180 20 40 20 40 90 C40 160 180 160 180 90 C180 20 320 20 320 90 C320 160 180 160 180 90" fill="none" stroke="currentColor" strokeWidth="8" className="text-brand-300" />
-              <circle r="10" fill="currentColor" className="text-amber-500">
-                <animateMotion dur="4s" repeatCount="indefinite" path="M180 90 C180 20 40 20 40 90 C40 160 180 160 180 90 C180 20 320 20 320 90 C320 160 180 160 180 90" />
-              </circle>
+            <svg viewBox="0 0 360 200" className="mx-auto h-56 w-full max-w-lg" role="img" aria-label="Daireyi izlenecek labirent yolu üzerinde hareket ettirin">
+              <polyline points={mazePath.map(({ x, y }) => `${x},${y}`).join(" ")} fill="none" stroke="currentColor" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" className="text-brand-200" />
+              {mazePath.map((point, index) => (
+                <circle key={index} cx={point.x} cy={point.y} r={index === mazeStep ? 13 : 7} className={index === mazeStep ? "fill-amber-500" : index < mazeStep ? "fill-emerald-500" : "fill-white stroke-brand-400"} />
+              ))}
             </svg>
-            <Button type="button" variant="primary" onClick={handleTrackingRoundComplete}>
-              Turu tamamladım
-            </Button>
+            <div className="flex flex-wrap justify-center gap-2">
+              {mazePath.map((_, index) => <Button key={index} type="button" size="sm" variant={index === mazeStep ? "primary" : "outline"} onClick={() => handleMazeStep(index)}>{index + 1}</Button>)}
+            </div>
           </div>
         )}
 
@@ -1312,6 +1528,54 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
                 </div>
               </>
             )}
+          </div>
+        )}
+
+        {phase === "playing" && kind === "digit_memory" && digitMemoryRounds[flashIndex] && (
+          <div className="space-y-4 rounded-xl bg-ivory-warm p-6 text-center">
+            {flashStage === "show" ? (
+              <>
+                <p className="text-sm font-semibold">Sayı dizisini sırayla aklınızda tutun.</p>
+                <div className="rounded-xl border border-amber-200 bg-white p-6 text-3xl font-mono font-bold tracking-[0.35em]">{digitMemoryRounds[flashIndex].sequence.join("")}</div>
+                <span className="inline-block rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-sm font-bold">{flashCountdown} sn</span>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-semibold">Diziyi aynı sırayla seçin: {digitMemoryInput.length}/{digitMemoryRounds[flashIndex].sequence.length}</p>
+                <div className="mx-auto grid max-w-xs grid-cols-3 gap-3">
+                  {Array.from({ length: 10 }, (_, digit) => <Button key={digit} type="button" variant="outline" onClick={() => handleDigitMemoryClick(digit)}>{digit}</Button>)}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {phase === "playing" && (kind === "pacer_reading" || kind === "regression_prevention") && pacerRounds[flashIndex] && (
+          <div className="space-y-4 rounded-xl bg-ivory-warm p-6 text-center">
+            <p className="text-sm font-semibold">{kind === "pacer_reading" ? "Vurguyu satır boyunca izleyin." : "İleriye doğru okuyun; geride kalan kelimeye dönmeyin."}</p>
+            <div className="flex flex-wrap justify-center gap-2 rounded-xl border border-amber-200 bg-white p-6 text-lg leading-10">
+              {pacerRounds[flashIndex].lines.map((word, index) => <button key={`${word}-${index}`} type="button" onClick={handlePacerClick} disabled={index !== pacerWordIndex} className={`rounded px-2 transition ${index === pacerWordIndex ? "bg-amber-300 font-bold text-brand-900" : index < pacerWordIndex ? "text-emerald-700" : "text-sage-400"}`}>{word}</button>)}
+            </div>
+            <p className="text-xs text-charcoal-muted">Kelime {pacerWordIndex + 1}/{pacerRounds[flashIndex].lines.length}</p>
+          </div>
+        )}
+
+        {phase === "playing" && kind === "n_back" && nBackRound && (
+          <div className="space-y-4 rounded-xl bg-ivory-warm p-6 text-center">
+            <p className="text-sm font-semibold">{nBackRound.n}-back: Geçerli harf {nBackRound.n} adım öncekiyle aynı mı?</p>
+            <div className="text-6xl font-bold text-brand-900">{nBackRound.sequence[nBackIndex]}</div>
+            {nBackIndex < nBackRound.n ? <Button type="button" variant="primary" onClick={() => setNBackIndex((index) => index + 1)}>Başlangıç dizisini göster</Button> : <div className="flex justify-center gap-3"><Button type="button" variant="outline" onClick={() => handleNBackAnswer(true)}>Aynı</Button><Button type="button" variant="outline" onClick={() => handleNBackAnswer(false)}>Farklı</Button></div>}
+            <p className="text-xs text-charcoal-muted">{Math.min(nBackIndex + 1, nBackRound.sequence.length)}/{nBackRound.sequence.length}</p>
+          </div>
+        )}
+
+        {phase === "playing" && kind === "visual_change" && visualChangeRound && (
+          <div className="space-y-4 rounded-xl bg-ivory-warm p-6 text-center">
+            <p className="text-sm font-semibold">İki görsel arasındaki değişen konumu seçin.</p>
+            <div className="grid grid-cols-2 gap-3">
+              {[visualChangeRound.before, visualChangeRound.after].map((items, side) => <div key={side} className="grid grid-cols-4 gap-2 rounded-xl border border-sage-200 bg-white p-3">{items.map((item, index) => <span key={index} className="flex aspect-square items-center justify-center rounded border border-sage-100 text-2xl">{item}</span>)}</div>)}
+            </div>
+            <div className="mx-auto grid max-w-sm grid-cols-4 gap-2">{visualChangeRound.before.map((_, index) => <Button key={index} type="button" size="sm" variant="outline" onClick={() => handleVisualChange(index)}>{index + 1}</Button>)}</div>
           </div>
         )}
 
