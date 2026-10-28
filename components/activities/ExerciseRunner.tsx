@@ -1007,8 +1007,8 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
                     </div>
                   ))}
                 </div>
-                <span className="inline-block rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-sm font-bold tabular-nums text-amber-900" aria-live="polite">
-                  {flashCountdown} sn
+                <span className="inline-block rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-sm font-bold tabular-nums text-amber-900" aria-live="assertive">
+                  Kalan süre: {flashCountdown} sn
                 </span>
               </>
             ) : (
