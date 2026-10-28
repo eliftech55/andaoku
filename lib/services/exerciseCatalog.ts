@@ -63,7 +63,7 @@ const EXERCISES: Record<
   schulte_table: {
     title: "Schulte Tablosu",
     description: "Sayıları sırayla bularak görsel tarama ve odaklanma çalışması.",
-    instructions: "Sayıları 1’den başlayarak mümkün olduğunca hızlı sırayla seçin.",
+    instructions: "Tablodaki sayıları 1’den başlayarak mümkün olduğunca hızlı ve doğru sırayla seçin.",
     targetSymbol: "",
   },
   regression_prevention: {

@@ -129,6 +129,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     gridSize * gridSize - 1,
     Math.max(3, activity.contentConfig.targetCount || 5)
   );
+  const schulteGridSize = Math.min(6, Math.max(3, activity.level || 1) + 2);
   const durationLimit = kind === "matching_cards"
     ? 75
     : Math.min(
@@ -178,6 +179,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   const [sequenceMemoryInput, setSequenceMemoryInput] = useState<number[]>([]);
   const [sequenceMemoryStage, setSequenceMemoryStage] = useState<"show" | "choose">("show");
   const [sequenceMemoryVisibleCount, setSequenceMemoryVisibleCount] = useState(0);
+  const [schulteExpected, setSchulteExpected] = useState(1);
   const [flashIndex, setFlashIndex] = useState(0);
   const [flashStage, setFlashStage] = useState<"show" | "choose">("show");
   const [flashCountdown, setFlashCountdown] = useState(0);
@@ -232,6 +234,8 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
           ? EXERCISE_ROUND_COUNT
           : kind === "memory_palace"
             ? memoryPalaceRoundConfig.length
+            : kind === "schulte_table"
+              ? schulteGridSize * schulteGridSize
             : targetCount;
     flashDeadlineRef.current = null;
     setCorrectAnswers(0);
@@ -256,6 +260,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     setSequenceMemoryInput([]);
     setSequenceMemoryStage("show");
     setSequenceMemoryVisibleCount(0);
+    setSchulteExpected(1);
     setTimeLeft(durationLimit);
     startedAt.current = Date.now();
 
@@ -276,6 +281,12 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       setTargets(targetIndices);
       setSelectedCells([]);
       setWrongCells([]);
+    } else if (kind === "schulte_table") {
+      const cellCount = schulteGridSize * schulteGridSize;
+      setGrid(shuffled(Array.from({ length: cellCount }, (_, index) => String(index + 1))));
+      setSelectedCells([]);
+      setWrongCells([]);
+      setSchulteExpected(1);
     } else if (kind === "eye_saccade") {
       const positions = shuffled(Array.from({ length: 9 }, (_, index) => index));
       setSequence(positions.slice(0, Math.min(sequenceLength, positions.length)));
@@ -530,6 +541,25 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       setWrongCells(nextWrong);
       wrongRef.current = nextWrong.length;
     }
+  };
+
+  const handleSchulteClick = (index: number) => {
+    if (phase !== "playing" || kind !== "schulte_table") return;
+    const value = Number(grid[index]);
+    if (value !== schulteExpected) {
+      wrongRef.current += 1;
+      setWrongCells((current) => [...current, index]);
+      return;
+    }
+
+    setSelectedCells((current) => [...current, index]);
+    correctRef.current += 1;
+    setCorrectAnswers(correctRef.current);
+    if (value === grid.length) {
+      finish(correctRef.current, wrongRef.current, grid.length);
+      return;
+    }
+    setSchulteExpected(value + 1);
   };
 
   const handleSaccadeClick = (index: number) => {
@@ -930,6 +960,38 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
                 </div>
               </>
             )}
+          </div>
+        )}
+
+        {phase === "playing" && kind === "schulte_table" && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-sm text-charcoal-muted">
+              <span>Sıradaki sayı: <strong className="text-brand-900">{schulteExpected}</strong></span>
+              <span>{schulteExpected - 1}/{grid.length} doğru</span>
+            </div>
+            <div
+              className="grid gap-2 rounded-xl bg-ivory-warm p-3"
+              style={{ gridTemplateColumns: `repeat(${schulteGridSize}, minmax(0, 1fr))` }}
+            >
+              {grid.map((value, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  aria-label={`Schulte sayısı ${value}`}
+                  onClick={() => handleSchulteClick(index)}
+                  disabled={selectedCells.includes(index)}
+                  className={`aspect-square rounded-lg border text-xl font-bold ${
+                    selectedCells.includes(index)
+                      ? "border-emerald-500 bg-emerald-100 text-emerald-800"
+                      : wrongCells.includes(index)
+                        ? "border-rose-300 bg-rose-100 text-rose-700"
+                        : "border-sage-200 bg-white text-charcoal hover:bg-amber-50"
+                  }`}
+                >
+                  {value}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
