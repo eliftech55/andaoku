@@ -439,12 +439,31 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   };
 
   useEffect(() => {
-    if (phase !== "playing" || !["flash_words", "word_memory", "memory_palace", "chunk_reading", "passage_memory"].includes(kind) || flashStage !== "show") return;
+    if (phase !== "playing" || kind !== "memory_palace" || flashStage !== "show") return;
+    const duration = 5000;
+    const deadline = Date.now() + duration;
+    flashDeadlineRef.current = deadline;
+    setFlashCountdown(5);
+    const countdownTimer = window.setInterval(() => {
+      setFlashCountdown(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)));
+    }, 100);
+    const finishTimer = window.setTimeout(() => {
+      setFlashCountdown(0);
+      setMemoryPalacePlaced(Array(memoryPalaceRounds[flashIndex]?.words.length ?? 0).fill(null));
+      setFlashStage("choose");
+    }, duration);
+    return () => {
+      window.clearInterval(countdownTimer);
+      window.clearTimeout(finishTimer);
+      if (flashDeadlineRef.current === deadline) flashDeadlineRef.current = null;
+    };
+  }, [flashIndex, flashStage, kind, memoryPalaceRounds, phase]);
+
+  useEffect(() => {
+    if (phase !== "playing" || !["flash_words", "word_memory", "chunk_reading", "passage_memory"].includes(kind) || flashStage !== "show") return;
     const displayDuration = kind === "word_memory"
       ? wordMemoryDuration
-      : kind === "memory_palace"
-        ? memoryPalaceRoundConfig[flashIndex]?.duration ?? 5
-        : flashDuration;
+      : flashDuration;
     const deadline = Date.now() + displayDuration;
     flashDeadlineRef.current = deadline;
     const updateCountdown = () => {
