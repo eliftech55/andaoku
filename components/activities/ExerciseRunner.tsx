@@ -133,7 +133,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     ? 75
     : Math.min(
       180,
-      Math.max(kind === "word_memory" ? 75 : 10, activity.contentConfig.timeLimitSeconds || 60)
+      Math.max(["word_memory", "passage_memory"].includes(kind) ? 75 : 10, activity.contentConfig.timeLimitSeconds || 60)
     );
   const sequenceLength = Math.min(20, Math.max(3, activity.contentConfig.sequenceLength || 4));
   const flashDuration = kind === "flash_words"
@@ -889,12 +889,8 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
             {flashStage === "show" ? (
               <>
                 <p className="text-sm font-semibold text-charcoal">Parçaları ve doğru sıralarını hatırlayın.</p>
-                <div className="space-y-2 text-left">
-                  {passageMemoryRounds[flashIndex].pieces.map((piece, index) => (
-                    <div key={piece} className="rounded-lg border border-amber-200 bg-white p-3 text-sm leading-relaxed text-brand-900">
-                      {index + 1}. {piece}
-                    </div>
-                  ))}
+                <div className="rounded-xl border border-amber-200 bg-white p-5 text-left text-base leading-relaxed text-brand-900">
+                  {passageMemoryRounds[flashIndex].pieces.join(" ")}
                 </div>
                 <span className="inline-block rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-sm font-bold tabular-nums text-amber-900" aria-live="polite">
                   {flashCountdown} sn
