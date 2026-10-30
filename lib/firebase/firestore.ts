@@ -5,6 +5,7 @@ import {
   getDocs,
   setDoc,
   addDoc,
+  deleteDoc,
   updateDoc,
   query,
   where,
@@ -25,6 +26,7 @@ import {
   ClassItem,
   ClassMembership,
   TeacherAssignment,
+  AssignmentSubmission,
   UserAssignment,
   AuditLog,
   EducationLevel,
@@ -603,6 +605,35 @@ export async function getClassMemberships(classId: string): Promise<ClassMembers
   }
 }
 
+export async function createClassMembership(
+  membership: Omit<ClassMembership, "id" | "joinedAt">
+): Promise<string> {
+  try {
+    const docRef = await addDoc(collection(db, "classMemberships"), {
+      ...membership,
+      joinedAt: new Date().toISOString(),
+    });
+    return docRef.id;
+  } catch (error) {
+    console.error("Sınıf üyeliği oluşturulamadı:", error);
+    throw error;
+  }
+}
+
+export async function getUserClassMemberships(userId: string): Promise<ClassMembership[]> {
+  try {
+    const snapshot = await getDocs(
+      query(collection(db, "classMemberships"), where("userId", "==", userId))
+    );
+    return snapshot.docs
+      .map((item) => ({ id: item.id, ...item.data() }) as ClassMembership)
+      .filter((membership) => membership.status === "active");
+  } catch (error) {
+    console.error("Kullanıcının sınıf üyelikleri getirilemedi:", error);
+    return [];
+  }
+}
+
 export async function getTeacherAssignments(teacherId: string): Promise<TeacherAssignment[]> {
   try {
     const assignRef = collection(db, "teacherAssignments");
@@ -621,10 +652,71 @@ export async function getTeacherAssignments(teacherId: string): Promise<TeacherA
 
 export async function createTeacherAssignment(assignment: Omit<TeacherAssignment, "id">): Promise<string> {
   try {
-    const docRef = await addDoc(collection(db, "teacherAssignments"), assignment);
+    const docRef = await addDoc(collection(db, "teacherAssignments"), {
+      ...assignment,
+      assignedAt: assignment.assignedAt || new Date().toISOString(),
+    });
     return docRef.id;
   } catch (error) {
     console.error("Ödev atama hatası:", error);
+    throw error;
+  }
+}
+
+export async function deleteTeacherAssignment(assignmentId: string): Promise<void> {
+  try {
+    await deleteDoc(doc(db, "teacherAssignments", assignmentId));
+  } catch (error) {
+    console.error("Öğretmen ataması silinemedi:", error);
+    throw error;
+  }
+}
+
+export async function getAssignmentsForStudent(userId: string): Promise<TeacherAssignment[]> {
+  const memberships = await getUserClassMemberships(userId);
+  if (memberships.length === 0) return [];
+  const classIds = new Set(memberships.map((membership) => membership.classId));
+  try {
+    const snapshot = await getDocs(collection(db, "teacherAssignments"));
+    return snapshot.docs
+      .map((item) => ({ id: item.id, ...item.data() }) as TeacherAssignment)
+      .filter((assignment) => assignment.status === "active" && classIds.has(assignment.classId))
+      .sort((left, right) => right.assignedAt.localeCompare(left.assignedAt));
+  } catch (error) {
+    console.error("Öğrenci atamaları getirilemedi:", error);
+    return [];
+  }
+}
+
+export async function getAssignmentSubmissions(assignmentIds: string[]): Promise<AssignmentSubmission[]> {
+  if (assignmentIds.length === 0) return [];
+  try {
+    const snapshots = await Promise.all(
+      assignmentIds.map((assignmentId) =>
+        getDocs(query(collection(db, "assignmentSubmissions"), where("assignmentId", "==", assignmentId)))
+      )
+    );
+    return snapshots.flatMap((snapshot) =>
+      snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as AssignmentSubmission)
+    );
+  } catch (error) {
+    console.error("Atama teslimleri getirilemedi:", error);
+    return [];
+  }
+}
+
+export async function saveAssignmentSubmission(
+  submission: Omit<AssignmentSubmission, "id" | "updatedAt">
+): Promise<void> {
+  const submissionId = `${submission.assignmentId}_${submission.userId}`;
+  try {
+    await setDoc(
+      doc(db, "assignmentSubmissions", submissionId),
+      { ...submission, updatedAt: new Date().toISOString() },
+      { merge: true }
+    );
+  } catch (error) {
+    console.error("Atama teslimi kaydedilemedi:", error);
     throw error;
   }
 }

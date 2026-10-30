@@ -90,7 +90,7 @@ describe("module unlocking", () => {
     title: "Modül 1",
     description: "",
     targetSkills: [],
-    difficulty: "easy",
+    difficulty: "beginner",
     exerciseTypes: exerciseTypes,
     prerequisites: [],
     requiredCompletionScore: 70,

@@ -26,6 +26,16 @@ npm run dev
 ```
 Uygulama varsayılan olarak **http://localhost:3005** adresinde çalışmaya başlar.
 
+### Gemini ile İçerik Üretimi
+
+Yönetim panelindeki yapay zekâ destekli içerik üretimi, yalnızca sunucuda kullanılan bir Gemini API anahtarı gerektirir. `.env.example` dosyasındaki aşağıdaki satırı `.env.local` dosyanıza kendi anahtarınızla ekleyin:
+
+```bash
+GEMINI_API_KEY="your-gemini-api-key"
+```
+
+Bu değişkeni `NEXT_PUBLIC_` ile başlatmayın ve anahtarı istemci koduna eklemeyin. `.env.local` değişikliğinden sonra çalışan geliştirme sunucusunu durdurup yeniden başlatın. Vercel gibi bir dağıtım ortamında aynı değişkeni ilgili ortam (Production/Preview) ayarlarına ekleyip yeniden dağıtım yapın.
+
 ---
 
 ## 🛠️ Teknoloji Mimarisi

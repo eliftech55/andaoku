@@ -112,6 +112,10 @@ function shuffled<T>(items: T[]): T[] {
   return [...items].sort(() => Math.random() - 0.5);
 }
 
+function randomDigitSequence(length: number): number[] {
+  return Array.from({ length }, () => Math.floor(Math.random() * 10));
+}
+
 const FLASH_LIKE_KINDS: ExerciseKind[] = [
   "flash_words",
   "chunk_reading",
@@ -452,22 +456,9 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       setFlashStage("show");
       setFlashCountdown(Math.ceil(flashDuration / 1000));
     } else if (kind === "digit_memory") {
-      const levelIdx = Math.min(5, Math.max(1, activity.level || 1)) - 1;
-      const sequencesByLevel = [
-        // Level 1 (length 3)
-        [[1,2,3],[4,5,6],[7,8,9]],
-        // Level 2 (length 5)
-        [[1,2,3,4,5],[6,7,8,9,0]],
-        // Level 3 (length 7)
-        [[1,2,3,4,5,6,7],[8,9,0,1,2,3,4]],
-        // Level 4 (length 9)
-        [[1,2,3,4,5,6,7,8,9],[0,1,2,3,4,5,6,7,8]],
-        // Level 5 (length 12)
-        [[1,2,3,4,5,6,7,8,9,0,1,2],[3,4,5,6,7,8,9,0,1,2,3,4]],
-      ];
-      const possible = sequencesByLevel[levelIdx];
-      const rounds = Array.from({ length: EXERCISE_ROUND_COUNT }, () => ({
-        sequence: possible[Math.floor(Math.random() * possible.length)],
+      const initialLength = Math.min(8, Math.max(3, (activity.level || 1) + 2));
+      const rounds = Array.from({ length: EXERCISE_ROUND_COUNT }, (_, roundIndex) => ({
+        sequence: randomDigitSequence(initialLength + roundIndex),
       }));
       setDigitMemoryRounds(rounds);
       setDigitMemoryInput([]);
@@ -738,12 +729,18 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     }
   };
 
-  const handleDigitMemoryClick = (digit: number) => {
+  const handleDigitMemoryInputChange = (value: string) => {
     if (phase !== "playing" || kind !== "digit_memory" || flashStage !== "choose") return;
-    const next = [...digitMemoryInput, digit];
-    setDigitMemoryInput(next);
+    const next = value.replace(/\D/g, "").split("").map(Number);
     const expected = digitMemoryRounds[flashIndex]?.sequence ?? [];
-    if (digit !== expected[next.length - 1]) {
+
+    if (next.length <= digitMemoryInput.length) {
+      setDigitMemoryInput(next);
+      return;
+    }
+
+    setDigitMemoryInput(next);
+    if (next.some((digit, index) => digit !== expected[index])) {
       setFlashStage("show");
       setFlashCountdown(Math.max(2, 7 - (activity.level || 1)));
       completeRound(false);
@@ -753,6 +750,14 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       setFlashCountdown(Math.max(2, 7 - (activity.level || 1)));
       setDigitMemoryInput([]);
     }
+  };
+
+  const handleDigitMemoryContinue = () => {
+    if (phase !== "playing" || kind !== "digit_memory" || flashStage !== "show") return;
+    flashDeadlineRef.current = null;
+    setFlashCountdown(0);
+    setDigitMemoryInput([]);
+    setFlashStage("choose");
   };
 
   const handlePacerClick = () => {
@@ -1536,15 +1541,33 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
             {flashStage === "show" ? (
               <>
                 <p className="text-sm font-semibold">Sayı dizisini sırayla aklınızda tutun.</p>
+                <span className="inline-block rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-sm font-bold">
+                  {flashCountdown} sn
+                </span>
                 <div className="rounded-xl border border-amber-200 bg-white p-6 text-3xl font-mono font-bold tracking-[0.35em]">{digitMemoryRounds[flashIndex].sequence.join("")}</div>
-                <span className="inline-block rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-sm font-bold">{flashCountdown} sn</span>
+                <div>
+                  <Button type="button" variant="primary" onClick={handleDigitMemoryContinue}>
+                    Devam et
+                  </Button>
+                </div>
               </>
             ) : (
               <>
-                <p className="text-sm font-semibold">Diziyi aynı sırayla seçin: {digitMemoryInput.length}/{digitMemoryRounds[flashIndex].sequence.length}</p>
-                <div className="mx-auto grid max-w-xs grid-cols-3 gap-3">
-                  {Array.from({ length: 10 }, (_, digit) => <Button key={digit} type="button" variant="outline" onClick={() => handleDigitMemoryClick(digit)}>{digit}</Button>)}
-                </div>
+                <p className="text-sm font-semibold">
+                  Diziyi aynı sırayla yazın: {digitMemoryInput.length}/{digitMemoryRounds[flashIndex].sequence.length}
+                </p>
+                <input
+                  autoFocus
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  type="text"
+                  value={digitMemoryInput.join("")}
+                  onChange={(event) => handleDigitMemoryInputChange(event.target.value)}
+                  className="mx-auto block w-full max-w-sm rounded-xl border border-amber-300 bg-white px-4 py-3 text-center text-2xl font-mono font-bold tracking-[0.35em] outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+                  aria-label="Sayı dizisini yazın"
+                  placeholder="Sayıları yazın"
+                />
+                <p className="text-xs text-charcoal-muted">Klavyenizden yalnızca rakamları yazın.</p>
               </>
             )}
           </div>
@@ -1552,11 +1575,31 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
 
         {phase === "playing" && (kind === "pacer_reading" || kind === "regression_prevention") && pacerRounds[flashIndex] && (
           <div className="space-y-4 rounded-xl bg-ivory-warm p-6 text-center">
-            <p className="text-sm font-semibold">{kind === "pacer_reading" ? "Vurguyu satır boyunca izleyin." : "İleriye doğru okuyun; geride kalan kelimeye dönmeyin."}</p>
+            <p className="text-sm font-semibold">
+              {kind === "pacer_reading" ? "Vurguyu satır boyunca izleyin." : "İleriye doğru okuyun; geride kalan kelimeye dönmeyin."}
+            </p>
             <div className="flex flex-wrap justify-center gap-2 rounded-xl border border-amber-200 bg-white p-6 text-lg leading-10">
-              {pacerRounds[flashIndex].lines.map((word, index) => <button key={`${word}-${index}`} type="button" onClick={handlePacerClick} disabled={index !== pacerWordIndex} className={`rounded px-2 transition ${index === pacerWordIndex ? "bg-amber-300 font-bold text-brand-900" : index < pacerWordIndex ? "text-emerald-700" : "text-sage-400"}`}>{word}</button>)}
+              {pacerRounds[flashIndex].lines.map((word, index) => (
+                <button
+                  key={`${word}-${index}`}
+                  type="button"
+                  onClick={handlePacerClick}
+                  disabled={index !== pacerWordIndex}
+                  className={`rounded px-2 transition ${
+                    index === pacerWordIndex
+                      ? "bg-amber-300 font-bold text-brand-900"
+                      : index < pacerWordIndex
+                        ? "text-emerald-700"
+                        : "text-sage-400"
+                  }`}
+                >
+                  {word}
+                </button>
+              ))}
             </div>
-            <p className="text-xs text-charcoal-muted">Kelime {pacerWordIndex + 1}/{pacerRounds[flashIndex].lines.length}</p>
+            <p className="text-xs text-charcoal-muted">
+              Kelime {pacerWordIndex + 1}/{pacerRounds[flashIndex].lines.length}
+            </p>
           </div>
         )}
 

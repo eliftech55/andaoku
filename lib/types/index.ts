@@ -321,11 +321,27 @@ export interface TeacherAssignment {
   id: string;
   teacherId: string;
   classId: string;
-  activityId: string;
-  activityTitle: string;
+  assignmentType: "passage" | "exercise";
+  targetId: string;
+  title: string;
+  activityId?: string;
+  passageId?: string;
+  activityTitle?: string;
   assignedAt: string;
-  dueAt: string;
+  dueAt?: string;
   status: "active" | "closed";
+}
+
+export interface AssignmentSubmission {
+  id: string;
+  assignmentId: string;
+  userId: string;
+  assignmentType: "passage" | "exercise";
+  score: number;
+  status: "completed";
+  completedAt: string;
+  updatedAt: string;
+  wpm?: number;
 }
 
 export interface UserAssignment {
