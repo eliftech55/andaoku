@@ -166,22 +166,28 @@ export async function fetchQuestionsForPassage(passageId: string): Promise<Quest
     if (list && list.length > 0) return list;
   } catch (e) {}
 
-  const exam = (await getAllPlacementExams()).find((item) => item.passageId === passageId);
-  if (exam) {
-    const placementQuestions = await getStudentPlacementQuestions(exam.code);
-    return placementQuestions.map((question) => ({
-      id: question.id,
-      passageId,
-      passageVersion: question.passageVersion,
-      questionType: "multiple_choice",
-      prompt: question.questionText,
-      options: question.options,
-      correctAnswer: "",
-      points: question.points,
-      explanation: question.explanation,
-      targetSkill: question.questionType,
-      status: question.status,
-    }));
+  try {
+    const exam = (await getAllPlacementExams()).find((item) => item.passageId === passageId);
+    if (exam) {
+      const placementQuestions = await getStudentPlacementQuestions(exam.code);
+      if (placementQuestions.length > 0) {
+        return placementQuestions.map((question) => ({
+          id: question.id,
+          passageId,
+          passageVersion: question.passageVersion,
+          questionType: "multiple_choice",
+          prompt: question.questionText,
+          options: question.options,
+          correctAnswer: "",
+          points: question.points,
+          explanation: question.explanation,
+          targetSkill: question.questionType,
+          status: question.status,
+        }));
+      }
+    }
+  } catch (e) {
+    console.warn("Yayınlanmış sınav soruları alınamadı, başlangıç soruları denenecek.");
   }
 
   return SEED_QUESTIONS.filter((q) => q.passageId === passageId);
