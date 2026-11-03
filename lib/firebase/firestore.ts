@@ -589,6 +589,20 @@ export async function createClass(classData: Omit<ClassItem, "id">): Promise<str
   }
 }
 
+export async function updateClass(
+  classId: string,
+  changes: Pick<ClassItem, "name" | "educationLevel" | "classCode" | "status">
+): Promise<void> {
+  await updateDoc(doc(db, "classes", classId), {
+    ...changes,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+export async function deleteClass(classId: string): Promise<void> {
+  await deleteDoc(doc(db, "classes", classId));
+}
+
 export async function getClassMemberships(classId: string): Promise<ClassMembership[]> {
   try {
     const membersRef = collection(db, "classMemberships");
@@ -620,6 +634,17 @@ export async function createClassMembership(
   }
 }
 
+export async function updateClassMembership(
+  membershipId: string,
+  changes: Pick<ClassMembership, "studentName" | "studentEmail" | "status">
+): Promise<void> {
+  await updateDoc(doc(db, "classMemberships", membershipId), changes);
+}
+
+export async function deleteClassMembership(membershipId: string): Promise<void> {
+  await deleteDoc(doc(db, "classMemberships", membershipId));
+}
+
 export async function getUserClassMemberships(userId: string): Promise<ClassMembership[]> {
   try {
     const snapshot = await getDocs(
@@ -632,6 +657,19 @@ export async function getUserClassMemberships(userId: string): Promise<ClassMemb
     console.error("Kullanıcının sınıf üyelikleri getirilemedi:", error);
     return [];
   }
+}
+
+export async function getStudentClassByCode(userId: string, classCode: string): Promise<ClassItem | null> {
+  const memberships = await getUserClassMemberships(userId);
+  const normalizedCode = classCode.trim().toUpperCase();
+  for (const membership of memberships) {
+    const snapshot = await getDoc(doc(db, "classes", membership.classId));
+    if (snapshot.exists()) {
+      const classItem = { id: snapshot.id, ...snapshot.data() } as ClassItem;
+      if (classItem.status === "active" && classItem.classCode.toUpperCase() === normalizedCode) return classItem;
+    }
+  }
+  return null;
 }
 
 export async function getTeacherAssignments(teacherId: string): Promise<TeacherAssignment[]> {

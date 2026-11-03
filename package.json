@@ -4,29 +4,32 @@
   "private": true,
   "description": "AndaOku — Daha bilinçli oku, daha iyi anla. Araştırma temelli dijital okuma ve anlama platformu.",
   "scripts": {
-   "dev": "next dev -p 3005",
-  "build": "next build",
-  "start": "next start",
-  "lint": "next lint",
-  "test": "vitest run"
+    "dev": "next dev -p 3005",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "vitest run"
   },
   "dependencies": {
     "@google/genai": "^2.31.0",
     "@hookform/resolvers": "^3.9.0",
+    "bcryptjs": "^2.4.3",
     "clsx": "^2.1.1",
     "firebase": "^10.14.1",
     "firebase-admin": "^12.6.0",
     "lucide-react": "^0.453.0",
     "next": "14.2.24",
+    "nodemailer": "^6.9.13",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.53.0",
     "recharts": "^2.13.0",
     "tailwind-merge": "^2.5.4",
-    "zod": "^3.23.8"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^20.17.0",
+    "@types/nodemailer": "^8.0.2",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.1",
     "autoprefixer": "^10.4.20",

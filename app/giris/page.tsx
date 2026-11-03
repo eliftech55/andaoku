@@ -163,6 +163,10 @@ export default function GirisPage() {
           </form>
         </Card>
 
+        <Link href="/ogrenci-giris" className="block rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm font-semibold text-amber-900 hover:bg-amber-100">
+          Öğrenciyseniz sınıf koduyla giriş yapın
+        </Link>
+
         {/* HIZLI TEST / İNCELEME GİRİŞİ */}
         <div className="p-4 rounded-2xl bg-ivory-warm border border-sage-200 space-y-3">
           <div className="flex items-center justify-between">

@@ -126,47 +126,64 @@ export default function KullaniciYonetimiPage() {
 
   const saveEditor = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!editingUser || !user || !taskTitle.trim()) {
-      setError("Görev başlığı boş bırakılamaz.");
+    if (!editingUser || !user) {
+      setError("Kullanıcı veya oturum bulunamadı.");
       return;
     }
-    setSaving(true);
-    setError(null);
+    // Update role first
     try {
       await updateUserRole(editingUser.uid, role);
-      const nextAssignment = {
-        title: taskTitle.trim(),
-        dueAt: dueAt ? new Date(`${dueAt}T23:59:59`).toISOString() : undefined,
-        status: "active" as const,
-      };
-      if (editingAssignment) {
-        await updateUserAssignment(editingAssignment.id, nextAssignment);
-        setAssignments((current) => ({
-          ...current,
-          [editingUser.uid]: (current[editingUser.uid] || []).map((item) =>
-            item.id === editingAssignment.id ? { ...item, ...nextAssignment } : item
-          ),
-        }));
-      } else {
-        const id = await createUserAssignment({
-          userId: editingUser.uid,
-          ...nextAssignment,
-          assignedBy: user.uid,
-          assignedAt: new Date().toISOString(),
-        });
-        setAssignments((current) => ({
-          ...current,
-          [editingUser.uid]: [...(current[editingUser.uid] || []), { id, ...nextAssignment, userId: editingUser.uid, assignedBy: user.uid, assignedAt: new Date().toISOString() }],
-        }));
-      }
       setUsers((current) => current.map((item) => item.uid === editingUser.uid ? { ...item, role } : item));
-      setEditingUser(null);
-      setMessage("Kullanıcı rolü ve görevi güncellendi.");
+    } catch {
+      setError("Kullanıcı rolü güncellenemedi.");
+      return;
+    }
+    // If a task title is provided, handle assignment update/creation
+    if (taskTitle.trim()) {
+      setSaving(true);
+      setError(null);
+      try {
+        const nextAssignment = {
+          title: taskTitle.trim(),
+          dueAt: dueAt ? new Date(`${dueAt}T23:59:59`).toISOString() : undefined,
+          status: "active" as const,
+        };
+        if (editingAssignment) {
+          await updateUserAssignment(editingAssignment.id, nextAssignment);
+          setAssignments((current) => ({
+            ...current,
+            [editingUser.uid]: (current[editingUser.uid] || []).map((item) =>
+              item.id === editingAssignment.id ? { ...item, ...nextAssignment } : item
+            ),
+          }));
+        } else {
+          const id = await createUserAssignment({
+            userId: editingUser.uid,
+            ...nextAssignment,
+            assignedBy: user.uid,
+            assignedAt: new Date().toISOString(),
+          });
+          setAssignments((current) => ({
+            ...current,
+            [editingUser.uid]: [...(current[editingUser.uid] || []), { id, ...nextAssignment, userId: editingUser.uid, assignedBy: user.uid, assignedAt: new Date().toISOString() }],
+          }));
+        }
+        setMessage("Kullanıcı rolü ve görevi güncellendi.");
+      } catch {
+        setError("Kullanıcı veya görev güncellenemedi.");
+      } finally {
+        setSaving(false);
+      }
+    } else {
+      setMessage("Kullanıcı rolü güncellendi.");
+    }
+    /*
     } catch {
       setError("Kullanıcı veya görev güncellenemedi.");
     } finally {
       setSaving(false);
     }
+    */
   };
 
   if (!hasAccess && !loading) {

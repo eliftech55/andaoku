@@ -39,6 +39,11 @@ service cloud.firestore {
       return hasRole('researcher') || isAdmin();
     }
 
+    function ownsClass(classId) {
+      return isTeacher() &&
+        get(/databases/$(database)/documents/classes/$(classId)).data.teacherId == request.auth.uid;
+    }
+
     // 1. Kullanıcı Profilleri (users)
     match /users/{userId} {
       allow read: if isAuthenticated() && (isOwner(userId) || isTeacher() || isAdmin());
@@ -125,15 +130,15 @@ service cloud.firestore {
     // 9. Sınıflar (classes)
     match /classes/{classId} {
       allow read: if isAuthenticated();
-      allow create: if isTeacher();
+      allow create: if isTeacher() && request.resource.data.teacherId == request.auth.uid;
       allow update, delete: if isTeacher() && resource.data.teacherId == request.auth.uid;
     }
 
     // 10. Sınıf Üyelikleri (classMemberships)
     match /classMemberships/{membershipId} {
-      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isTeacher());
-      allow create: if isAuthenticated();
-      allow update, delete: if isTeacher();
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || ownsClass(resource.data.classId));
+      allow create: if ownsClass(request.resource.data.classId);
+      allow update, delete: if ownsClass(resource.data.classId);
     }
 
     // 11. Öğretmen Atamaları (teacherAssignments)

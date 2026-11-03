@@ -9,6 +9,7 @@ import {
   User,
 } from "firebase/auth";
 import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
+import { sendAdminNotification, sendUserApprovalEmail } from "@/lib/email";
 import { auth, db, isFirebaseConfigured } from "./client";
 import { UserProfile, UserRole, EducationLevel, UserPreferences } from "../types";
 
@@ -137,8 +138,39 @@ export async function signUpUser(
     };
 
     try {
-      await setDoc(doc(db, "users", user.uid), {
-        ...newProfile,
+        await setDoc(doc(db, "users", user.uid), {
+          ...newProfile,
+          serverCreatedAt: serverTimestamp(),
+        });
+        // Admin'e yeni kayıt bildirimi gönder – server‑side API call
+        void fetch('/api/adminNotify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newProfile),
+        });
+      } catch (dbErr: unknown) {
+        console.error("Firebase hesabı oluşturuldu ancak Firestore profili kaydedilemedi:", dbErr);
+        try {
+          await deleteUser(user);
+        } catch (cleanupError: unknown) {
+          console.error("Profili kaydedilemeyen Firebase hesabı temizlenemedi:", cleanupError);
+          return {
+            user: null,
+            profile: null,
+            error: "Hesap oluşturuldu ancak profil kaydedilemedi ve hesap otomatik olarak temizlenemedi. Lütfen destek ekibiyle iletişime geçin.",
+          };
+        }
+        return {
+          user: null,
+          profile: null,
+          error: "Kayıt profili Firestore'a kaydedilemediği için hesap oluşturma işlemi geri alındı. Lütfen tekrar deneyin.",
+        };
+      }
+      /*
+          serverCreatedAt: serverTimestamp(),
+
+
+
         serverCreatedAt: serverTimestamp(),
       });
     } catch (dbErr: unknown) {
@@ -160,6 +192,7 @@ export async function signUpUser(
         error: "Kayıt profili Firestore'a kaydedilemediği için hesap oluşturma işlemi geri alındı. Lütfen tekrar deneyin.",
       };
     }
+    */
 
     if (typeof window !== "undefined") {
       try {

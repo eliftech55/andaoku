@@ -313,6 +313,7 @@ export interface ClassMembership {
   userId: string;
   studentName?: string;
   studentEmail?: string;
+  studentUsername?: string;
   joinedAt: string;
   status: "active" | "removed";
 }

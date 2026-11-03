@@ -97,7 +97,6 @@ describe("module unlocking", () => {
     order: 1,
     estimatedDuration: 10,
     status: "published",
-    createdBy: "test",
     createdAt: "",
     updatedAt: "",
   };

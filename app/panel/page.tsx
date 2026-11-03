@@ -22,8 +22,8 @@ import {
   Calendar,
   AlertCircle,
 } from "lucide-react";
-import { getUserAssessmentResults, getUserProgressList, getUserReadingSessions } from "@/lib/firebase/firestore";
-import { AssessmentResult, LearningModule, UserProgress, ReadingSession } from "@/lib/types";
+import { getAssignmentsForStudent, getUserAssessmentResults, getUserProgressList, getUserReadingSessions } from "@/lib/firebase/firestore";
+import { AssessmentResult, LearningModule, UserProgress, ReadingSession, TeacherAssignment } from "@/lib/types";
 import { generateLearningRecommendation } from "@/lib/services/recommendationEngine";
 import { fetchAllModules, fetchActivities } from "@/lib/services/contentService";
 import { ProgressCharts } from "@/components/charts/ProgressCharts";
@@ -38,6 +38,7 @@ export default function UserDashboardPage() {
   const [totalModules, setTotalModules] = useState(0);
   const [modules, setModules] = useState<LearningModule[]>([]);
   const [readingSessions, setReadingSessions] = useState<ReadingSession[]>([]);
+  const [assignments, setAssignments] = useState<TeacherAssignment[]>([]);
   const [recommendation, setRecommendation] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -46,12 +47,13 @@ export default function UserDashboardPage() {
       const uid = user?.uid || profile?.uid || "demo-learner-123";
 
       try {
-        const [results, progress, sessions, modules, activities] = await Promise.all([
+        const [results, progress, sessions, modules, activities, teacherAssignments] = await Promise.all([
           getUserAssessmentResults(uid),
           getUserProgressList(uid),
           getUserReadingSessions(uid),
           fetchAllModules(),
           fetchActivities(),
+          getAssignmentsForStudent(uid),
         ]);
 
         setAssessmentResults(results);
@@ -59,6 +61,7 @@ export default function UserDashboardPage() {
         setTotalModules(modules.length);
         setModules(modules.sort((left, right) => left.order - right.order));
         setReadingSessions(sessions);
+        setAssignments(teacherAssignments);
 
         // Kural tabanlı öneri motorunu çalıştır
         const rec = generateLearningRecommendation({
@@ -251,6 +254,25 @@ export default function UserDashboardPage() {
         </div>
         <ProgressCharts assessmentResults={assessmentResults} />
       </div>
+
+      {assignments.length > 0 && (
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold font-serif text-charcoal">Öğretmenimden Gelen Görevler</h2>
+            <Badge variant="amber">{assignments.length} aktif görev</Badge>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {assignments.map((assignment) => (
+              <Card key={assignment.id} className="border-amber-200 bg-amber-50/40">
+                <CardContent className="flex items-center justify-between gap-3 p-5">
+                  <div><p className="font-bold text-charcoal">{assignment.title}</p><p className="mt-1 text-xs text-charcoal-muted">{assignment.dueAt ? `Son tarih: ${new Date(assignment.dueAt).toLocaleDateString("tr-TR")}` : "Son tarih yok"}</p></div>
+                  <Link href={assignment.assignmentType === "passage" ? `/panel/okuma-laboratuvari?passageId=${encodeURIComponent(assignment.targetId)}` : `/panel/egzersizler/${encodeURIComponent(assignment.targetId)}`}><Button size="sm" variant="amber">Başla</Button></Link>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* MODÜLLER */}
       <div className="space-y-4">

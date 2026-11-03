@@ -363,7 +363,7 @@ function OkumaLaboratuvariContent() {
             activityId={selectedActivity?.id}
             readingPacingWpm={selectedActivity?.contentConfig.speedPacingWpm}
             chunkSize={selectedActivity?.contentConfig.chunkSize}
-            persistResults={false}
+            persistResults={Boolean(user || profile)}
             onComplete={handleLabComplete}
           />
         ) : (
