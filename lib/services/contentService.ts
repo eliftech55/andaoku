@@ -167,6 +167,25 @@ export async function fetchQuestionsForPassage(passageId: string): Promise<Quest
   } catch (e) {}
 
   try {
+    const packageContent = (await getPublishedPlacementPackages()).find(
+      (content) => content.passage.id === passageId
+    );
+    if (packageContent?.questions.length) {
+      return packageContent.questions.map((question) => ({
+        id: question.id,
+        passageId,
+        passageVersion: question.passageVersion,
+        questionType: "multiple_choice",
+        prompt: question.questionText,
+        options: question.options,
+        correctAnswer: question.correctOptionId,
+        points: question.points,
+        explanation: question.explanation,
+        targetSkill: question.questionType,
+        status: question.status,
+      }));
+    }
+
     const exam = (await getAllPlacementExams()).find((item) => item.passageId === passageId);
     if (exam) {
       const placementQuestions = await getStudentPlacementQuestions(exam.code);
