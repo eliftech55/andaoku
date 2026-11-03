@@ -4,6 +4,12 @@ import { adminAuth, adminDb } from "@/lib/firebase/admin";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+function normalize(value: unknown): string {
+  return typeof value === "string"
+    ? value.trim().toLocaleLowerCase("tr-TR").replace(/\s+/g, " ")
+    : "";
+}
+
 export async function GET(request: NextRequest) {
   try {
     const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
@@ -13,13 +19,36 @@ export async function GET(request: NextRequest) {
     }
 
     await adminAuth.verifyIdToken(token);
-    const examSnapshot = await adminDb
-      .collection("placementExams")
-      .where("passageId", "==", passageId)
-      .where("status", "==", "published")
-      .limit(1)
-      .get();
-    const exam = examSnapshot.docs[0];
+    const database = adminDb;
+    const [requestedPassage, examSnapshot] = await Promise.all([
+      database.collection("readingPassages").doc(passageId).get(),
+      database.collection("placementExams").where("status", "==", "published").get(),
+    ]);
+    const requestedData = requestedPassage.exists ? requestedPassage.data() : undefined;
+    const exams = examSnapshot.docs.filter((item) => {
+      const exam = item.data();
+      if (exam.passageId === passageId) return true;
+      return false;
+    });
+
+    let matchingExam: Array<typeof examSnapshot.docs[number] | null> = [];
+    if (!exams[0] && requestedData) {
+      matchingExam = await Promise.all(
+        examSnapshot.docs.map(async (item) => {
+          const passage = await database
+            .collection("placementPassages")
+            .doc(String(item.data().passageId || ""))
+            .get();
+          const data = passage.data();
+          return data &&
+            (normalize(data.title) === normalize(requestedData.title) ||
+              normalize(data.content) === normalize(requestedData.content))
+            ? item
+            : null;
+        })
+      );
+    }
+    const exam = exams[0] || matchingExam.find((item) => item !== null);
     if (!exam) return NextResponse.json({ questions: [] });
 
     const questionSnapshot = await adminDb
