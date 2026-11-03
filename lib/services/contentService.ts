@@ -160,13 +160,53 @@ export async function fetchActivityById(id: string): Promise<Activity | null> {
   return SEED_ACTIVITIES.find((a) => a.id === id) || null;
 }
 
-export async function fetchQuestionsForPassage(passageId: string): Promise<Question[]> {
+export async function fetchQuestionsForPassage(
+  passageId: string,
+  accessToken?: string
+): Promise<Question[]> {
   try {
     const list = await getQuestionsFirestore(passageId);
     if (list && list.length > 0) return list;
   } catch (e) {}
 
   try {
+    if (accessToken) {
+      const response = await fetch(
+        `/api/placement/questions?passageId=${encodeURIComponent(passageId)}`,
+        { headers: { Authorization: `Bearer ${accessToken}` }, cache: "no-store" }
+      );
+      if (response.ok) {
+        const data = (await response.json()) as {
+          questions?: Array<{
+            id: string;
+            passageVersion: number;
+            questionText: string;
+            options: Question["options"];
+            correctOptionId: string;
+            points: number;
+            explanation: string;
+            questionType: string;
+            status: Question["status"];
+          }>;
+        };
+        if (data.questions?.length) {
+          return data.questions.map((question) => ({
+            id: question.id,
+            passageId,
+            passageVersion: question.passageVersion,
+            questionType: "multiple_choice",
+            prompt: question.questionText,
+            options: question.options,
+            correctAnswer: question.correctOptionId,
+            points: question.points,
+            explanation: question.explanation,
+            targetSkill: question.questionType,
+            status: question.status,
+          }));
+        }
+      }
+    }
+
     const packages = await getPublishedPlacementPackages();
     const passage = await fetchPassageById(passageId);
     const normalize = (value: string) =>
