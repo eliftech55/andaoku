@@ -21,8 +21,11 @@ import {
 } from "lucide-react";
 import { ClassItem, TeacherAssignment } from "@/lib/types";
 import { getTeacherClasses, createClass, getTeacherAssignments, createTeacherAssignment } from "@/lib/firebase/firestore";
+import { TeacherDashboard } from "@/components/teacher/TeacherDashboard";
 
 export default function OgretmenPaneliPage() {
+  return <TeacherDashboard />;
+
   const { user, profile } = useAuth();
 
   const [classes, setClasses] = useState<ClassItem[]>([]);
@@ -78,6 +81,9 @@ export default function OgretmenPaneliPage() {
               id: "asg-1",
               teacherId: uid,
               classId: "cls-7a",
+              assignmentType: "exercise",
+              targetId: "act-pretest-1",
+              title: "HaftalÄ±k AkÄ±cÄ± Okuma ve Ã‡Ä±karÄ±m Ã–devi",
               activityId: "act-pretest-1",
               activityTitle: "Haftalık Akıcı Okuma ve Çıkarım Ödevi",
               assignedAt: new Date().toISOString(),
@@ -126,6 +132,9 @@ export default function OgretmenPaneliPage() {
       id: "asg-" + Date.now(),
       teacherId: uid,
       classId: targetClassId,
+      assignmentType: "exercise",
+      targetId: "act-fluency-1",
+      title: assignmentTitle,
       activityId: "act-fluency-1",
       activityTitle: assignmentTitle,
       assignedAt: new Date().toISOString(),
