@@ -167,8 +167,15 @@ export async function fetchQuestionsForPassage(passageId: string): Promise<Quest
   } catch (e) {}
 
   try {
-    const packageContent = (await getPublishedPlacementPackages()).find(
-      (content) => content.passage.id === passageId
+    const packages = await getPublishedPlacementPackages();
+    const passage = await fetchPassageById(passageId);
+    const normalize = (value: string) =>
+      value.trim().toLocaleLowerCase("tr-TR").replace(/\s+/g, " ");
+    const packageContent = packages.find((content) =>
+      content.passage.id === passageId ||
+      (passage &&
+        (normalize(content.passage.title) === normalize(passage.title) ||
+          normalize(content.passage.content) === normalize(passage.content)))
     );
     if (packageContent?.questions.length) {
       return packageContent.questions.map((question) => ({
