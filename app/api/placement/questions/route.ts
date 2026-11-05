@@ -25,6 +25,29 @@ export async function GET(request: NextRequest) {
       database.collection("placementExams").where("status", "==", "published").get(),
     ]);
     const requestedData = requestedPassage.exists ? requestedPassage.data() : undefined;
+    const readingQuestionSnapshot = await database
+      .collection("questions")
+      .where("passageId", "==", passageId)
+      .get();
+    if (!readingQuestionSnapshot.empty) {
+      return NextResponse.json({
+        questions: readingQuestionSnapshot.docs.map((item) => {
+          const question = item.data();
+          return {
+            id: item.id,
+            passageVersion: question.passageVersion || requestedData?.version || 1,
+            questionText: question.prompt || question.questionText || "",
+            options: question.options || [],
+            correctOptionId: question.correctAnswer || question.correctOptionId || "",
+            points: question.points || 0,
+            explanation: question.explanation || "",
+            questionType: question.targetSkill || question.questionType || "ana_fikir",
+            status: question.status || "published",
+          };
+        }),
+      });
+    }
+
     const exams = examSnapshot.docs.filter((item) => {
       const exam = item.data();
       if (exam.passageId === passageId) return true;
