@@ -68,7 +68,19 @@ export async function fetchPassages(
 export async function fetchExerciseContent(): Promise<
   { passage: ReadingPassage; questions: Question[] }[]
 > {
-  const packages = await getPublishedPlacementPackages();
+  let packages: Awaited<ReturnType<typeof getPublishedPlacementPackages>> = [];
+  try {
+    packages = await getPublishedPlacementPackages();
+  } catch (error) {
+    // placementQuestions is intentionally restricted to content managers.
+    // Authenticated learners and teachers load their questions through the server API.
+    console.warn("Egzersiz paketleri doğrudan alınamadı; sorular güvenli API üzerinden yüklenecek.", error);
+    const passages = await getReadingPassages();
+    return (passages.length ? passages : SEED_PASSAGES).map((passage) => ({
+      passage,
+      questions: [],
+    }));
+  }
 
   return packages.map(({ exam, passage, questions }) => ({
     passage: {
