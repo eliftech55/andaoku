@@ -10,6 +10,56 @@ function normalize(value: unknown): string {
     : "";
 }
 
+function firestoreValue(value: Record<string, unknown> | undefined): unknown {
+  if (!value) return undefined;
+  if ("stringValue" in value) return value.stringValue;
+  if ("integerValue" in value) return Number(value.integerValue);
+  if ("doubleValue" in value) return value.doubleValue;
+  if ("booleanValue" in value) return value.booleanValue;
+  if ("timestampValue" in value) return value.timestampValue;
+  if ("nullValue" in value) return null;
+  if ("arrayValue" in value) {
+    const values = (value.arrayValue as { values?: Record<string, unknown>[] }).values || [];
+    return values.map((item) => firestoreValue(item));
+  }
+  if ("mapValue" in value) {
+    const fields = (value.mapValue as { fields?: Record<string, Record<string, unknown>> }).fields || {};
+    return Object.fromEntries(
+      Object.entries(fields).map(([key, item]) => [key, firestoreValue(item)])
+    );
+  }
+  return undefined;
+}
+
+async function getFirestoreRestCollection(
+  collectionName: string,
+  token: string
+): Promise<Array<{ id: string; data: Record<string, unknown> }>> {
+  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  if (!projectId) return [];
+
+  const response = await fetch(
+    `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/${collectionName}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    }
+  );
+  if (!response.ok) {
+    throw new Error(`Firestore REST isteği başarısız oldu (${response.status}).`);
+  }
+
+  const body = (await response.json()) as {
+    documents?: Array<{ name: string; fields?: Record<string, Record<string, unknown>> }>;
+  };
+  return (body.documents || []).map((document) => ({
+    id: document.name.split("/").pop() || "",
+    data: Object.fromEntries(
+      Object.entries(document.fields || {}).map(([key, value]) => [key, firestoreValue(value)])
+    ),
+  }));
+}
+
 export async function GET(request: NextRequest) {
   try {
     const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
@@ -19,6 +69,43 @@ export async function GET(request: NextRequest) {
     }
 
     await adminAuth.verifyIdToken(token);
+    if (!adminAuth || !adminDb) {
+      const [passages, questions, exams] = await Promise.all([
+        getFirestoreRestCollection("readingPassages", token),
+        getFirestoreRestCollection("questions", token),
+        getFirestoreRestCollection("placementExams", token),
+      ]);
+      const requestedPassage = passages.find((item) => item.id === passageId);
+      const readingQuestions = questions.filter((item) => item.data.passageId === passageId);
+      if (readingQuestions.length > 0) {
+        return NextResponse.json({
+          questions: readingQuestions.map(({ id, data: question }) => ({
+            id,
+            passageVersion: question.passageVersion || requestedPassage?.data.version || 1,
+            questionText: question.prompt || question.questionText || "",
+            options: question.options || [],
+            correctOptionId: question.correctAnswer || question.correctOptionId || "",
+            points: question.points || 0,
+            explanation: question.explanation || "",
+            questionType: question.targetSkill || question.questionType || "ana_fikir",
+            status: question.status || "published",
+          })),
+        });
+      }
+
+      const publishedExams = exams.filter((item) => item.data.status === "published");
+      const matchingExam = publishedExams.find((item) => item.data.passageId === passageId);
+      if (!matchingExam) return NextResponse.json({ questions: [] });
+      const placementQuestions = await getFirestoreRestCollection("placementQuestions", token);
+
+      return NextResponse.json({
+        questions: placementQuestions
+          .filter((item) => item.data.examId === matchingExam.id)
+          .sort((left, right) => Number(left.data.order || 0) - Number(right.data.order || 0))
+          .map(({ id, data }) => ({ id, ...data })),
+      });
+    }
+
     const database = adminDb;
     const [requestedPassage, examSnapshot] = await Promise.all([
       database.collection("readingPassages").doc(passageId).get(),

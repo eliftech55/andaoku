@@ -17,11 +17,6 @@ if (!admin.apps.length) {
           privateKey,
         }),
       });
-    } else {
-      // Çevresel değişkenler yoksa varsayılan başlatma (GCP ortamları için)
-      admin.initializeApp({
-        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "andaoku-edu",
-      });
     }
   } catch (error) {
     console.warn("Firebase Admin SDK başlatılırken uyarı (istemci tarafı bu modülü kullanmamalıdır):", error);
