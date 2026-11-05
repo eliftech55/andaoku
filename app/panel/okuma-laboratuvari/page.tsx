@@ -133,10 +133,13 @@ function OkumaLaboratuvariContent() {
         }
         setQuestionsLoading(true);
         const exerciseContent = exerciseList.find((content) => content.passage.id === target.id);
+        const configuredQuestionIds = activity?.assessmentConfig?.questionIds
+          || activityList.find((item) => item.contentConfig.passageId === target.id)
+            ?.assessmentConfig?.questionIds;
         const accessToken = user ? await user.getIdToken() : undefined;
         const qList = exerciseContent?.questions.length
           ? exerciseContent.questions
-          : await fetchQuestionsForPassage(target.id, accessToken);
+          : await fetchQuestionsForPassage(target.id, accessToken, configuredQuestionIds);
         if (active) {
           setQuestions(qList);
           setQuestionsLoading(false);
@@ -160,9 +163,10 @@ function OkumaLaboratuvariContent() {
     setQuestionsLoading(true);
     const exerciseContent = exerciseContents.find((content) => content.passage.id === p.id);
     const accessToken = user ? await user.getIdToken() : undefined;
+    const configuredQuestionIds = selectedActivity?.assessmentConfig?.questionIds;
     const qList = exerciseContent?.questions.length
       ? exerciseContent.questions
-      : await fetchQuestionsForPassage(p.id, accessToken);
+      : await fetchQuestionsForPassage(p.id, accessToken, configuredQuestionIds);
     setQuestions(qList);
     setQuestionsLoading(false);
   };

@@ -174,7 +174,8 @@ export async function fetchActivityById(id: string): Promise<Activity | null> {
 
 export async function fetchQuestionsForPassage(
   passageId: string,
-  accessToken?: string
+  accessToken?: string,
+  questionIds?: string[]
 ): Promise<Question[]> {
   try {
     const list = await getQuestionsFirestore(passageId);
@@ -266,6 +267,16 @@ export async function fetchQuestionsForPassage(
     }
   } catch (e) {
     console.warn("Yayınlanmış sınav soruları alınamadı, başlangıç soruları denenecek.");
+  }
+
+  if (questionIds?.length) {
+    const questionsById = new Map(SEED_QUESTIONS.map((question) => [question.id, question]));
+    const configuredQuestions = questionIds
+      .map((questionId) => questionsById.get(questionId))
+      .filter((question): question is Question => Boolean(question));
+    if (configuredQuestions.length) {
+      return configuredQuestions.map((question) => ({ ...question, passageId }));
+    }
   }
 
   const seedPassage = SEED_PASSAGES.find((item) => item.id === passageId);
