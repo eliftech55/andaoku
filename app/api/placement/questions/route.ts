@@ -60,6 +60,58 @@ async function getFirestoreRestCollection(
   }));
 }
 
+async function getFirestoreRestQuery(
+  collectionName: string,
+  fieldPath: string,
+  value: string,
+  token: string
+): Promise<Array<{ id: string; data: Record<string, unknown> }>> {
+  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  if (!projectId) return [];
+
+  const response = await fetch(
+    `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents:runQuery`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: collectionName }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath },
+              op: "EQUAL",
+              value: { stringValue: value },
+            },
+          },
+        },
+      }),
+      cache: "no-store",
+    }
+  );
+  if (!response.ok) {
+    throw new Error(`Firestore sorgusu başarısız oldu (${response.status}).`);
+  }
+
+  const rows = (await response.json()) as Array<{
+    document?: { name: string; fields?: Record<string, Record<string, unknown>> };
+  }>;
+  return rows
+    .filter((row) => row.document)
+    .map((row) => ({
+      id: row.document!.name.split("/").pop() || "",
+      data: Object.fromEntries(
+        Object.entries(row.document!.fields || {}).map(([key, item]) => [
+          key,
+          firestoreValue(item),
+        ])
+      ),
+    }));
+}
+
 export async function GET(request: NextRequest) {
   try {
     const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
@@ -74,7 +126,7 @@ export async function GET(request: NextRequest) {
     if (!adminAuth || !adminDb) {
       const [passages, questions, exams, placementPassages] = await Promise.all([
         getFirestoreRestCollection("readingPassages", token),
-        getFirestoreRestCollection("questions", token),
+        getFirestoreRestQuery("questions", "passageId", passageId, token),
         getFirestoreRestCollection("placementExams", token),
         getFirestoreRestCollection("placementPassages", token),
       ]);
@@ -111,7 +163,12 @@ export async function GET(request: NextRequest) {
         );
       });
       if (!matchingExam) return NextResponse.json({ questions: [] });
-      const placementQuestions = await getFirestoreRestCollection("placementQuestions", token);
+      const placementQuestions = await getFirestoreRestQuery(
+        "placementQuestions",
+        "examId",
+        matchingExam.id,
+        token
+      );
 
       return NextResponse.json({
         questions: placementQuestions
