@@ -181,7 +181,7 @@ export function ReadingLab({
 
     const comprehensionScore = questions.length > 0
       ? calculateComprehensionScore(correctCount, questions.length)
-      : 100;
+      : 0;
 
     const evaluation = evaluateReadingPerformance(wpm, comprehensionScore);
 

@@ -64,16 +64,19 @@ export async function GET(request: NextRequest) {
   try {
     const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
     const passageId = request.nextUrl.searchParams.get("passageId");
-    if (!token || !passageId || !adminAuth || !adminDb) {
+    if (!token || !passageId) {
       return NextResponse.json({ questions: [] }, { status: 401 });
     }
 
-    await adminAuth.verifyIdToken(token);
+    if (adminAuth) {
+      await adminAuth.verifyIdToken(token);
+    }
     if (!adminAuth || !adminDb) {
-      const [passages, questions, exams] = await Promise.all([
+      const [passages, questions, exams, placementPassages] = await Promise.all([
         getFirestoreRestCollection("readingPassages", token),
         getFirestoreRestCollection("questions", token),
         getFirestoreRestCollection("placementExams", token),
+        getFirestoreRestCollection("placementPassages", token),
       ]);
       const requestedPassage = passages.find((item) => item.id === passageId);
       const readingQuestions = questions.filter((item) => item.data.passageId === passageId);
@@ -94,7 +97,19 @@ export async function GET(request: NextRequest) {
       }
 
       const publishedExams = exams.filter((item) => item.data.status === "published");
-      const matchingExam = publishedExams.find((item) => item.data.passageId === passageId);
+      const requestedData = requestedPassage?.data;
+      const matchingExam = publishedExams.find((item) => {
+        if (item.data.passageId === passageId) return true;
+        const placementPassage = placementPassages.find(
+          (passage) => passage.id === item.data.passageId
+        );
+        return Boolean(
+          requestedData &&
+          placementPassage &&
+          (normalize(placementPassage.data.title) === normalize(requestedData.title) ||
+            normalize(placementPassage.data.content) === normalize(requestedData.content))
+        );
+      });
       if (!matchingExam) return NextResponse.json({ questions: [] });
       const placementQuestions = await getFirestoreRestCollection("placementQuestions", token);
 
