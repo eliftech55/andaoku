@@ -207,19 +207,6 @@ function OkumaLaboratuvariContent() {
     ];
     localStorage.setItem(historyKey, JSON.stringify(nextHistory));
     setLabHistory(nextHistory);
-    const eligibleContents = !user && !profile
-      ? exerciseContents.filter((content) => content.passage.difficulty === "beginner")
-      : exerciseContents;
-    const remaining = eligibleContents
-      .map((content) => content.passage)
-      .filter((passage) => !nextHistory.some((entry) => entry.passageId === passage.id));
-    if (remaining.length === 0) {
-      setPassages(eligibleContents.map((content) => content.passage));
-    } else {
-      const nextPassage = remaining[Math.floor(Math.random() * remaining.length)];
-      setPassages([nextPassage]);
-      void handlePassageSelect(nextPassage);
-    }
   };
 
   return (
