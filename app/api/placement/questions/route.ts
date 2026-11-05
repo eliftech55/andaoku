@@ -112,6 +112,38 @@ async function getFirestoreRestQuery(
     }));
 }
 
+async function getFirestoreRestDocument(
+    collectionName: string,
+    documentId: string,
+    token: string
+): Promise<{ id: string; data: Record<string, unknown> } | null> {
+    const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+    if (!projectId) return null;
+
+    const response = await fetch(
+      `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/${collectionName}/${encodeURIComponent(documentId)}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+      }
+    );
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      throw new Error(`Firestore belge isteği başarısız oldu (${response.status}).`);
+    }
+
+    const document = (await response.json()) as {
+      name: string;
+      fields?: Record<string, Record<string, unknown>>;
+    };
+    return {
+      id: document.name.split("/").pop() || documentId,
+      data: Object.fromEntries(
+        Object.entries(document.fields || {}).map(([key, item]) => [key, firestoreValue(item)])
+      ),
+    };
+}
+
 export async function GET(request: NextRequest) {
   try {
     const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
@@ -124,13 +156,12 @@ export async function GET(request: NextRequest) {
       await adminAuth.verifyIdToken(token);
     }
     if (!adminAuth || !adminDb) {
-      const [passages, questions, exams, placementPassages] = await Promise.all([
-        getFirestoreRestCollection("readingPassages", token),
+      const [requestedPassage, questions, exams, placementPassages] = await Promise.all([
+        getFirestoreRestDocument("readingPassages", passageId, token),
         getFirestoreRestQuery("questions", "passageId", passageId, token),
-        getFirestoreRestCollection("placementExams", token),
-        getFirestoreRestCollection("placementPassages", token),
+        getFirestoreRestQuery("placementExams", "status", "published", token),
+        getFirestoreRestQuery("placementPassages", "status", "published", token),
       ]);
-      const requestedPassage = passages.find((item) => item.id === passageId);
       const readingQuestions = questions.filter((item) => item.data.passageId === passageId);
       if (readingQuestions.length > 0) {
         return NextResponse.json({
