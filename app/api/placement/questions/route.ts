@@ -156,18 +156,11 @@ export async function GET(request: NextRequest) {
       await adminAuth.verifyIdToken(token);
     }
     if (!adminAuth || !adminDb) {
-      const [requestedPassage, questions, exams, placementPassages] = await Promise.all([
-        getFirestoreRestDocument("readingPassages", passageId, token),
-        getFirestoreRestQuery("questions", "passageId", passageId, token),
-        getFirestoreRestQuery("placementExams", "status", "published", token),
-        getFirestoreRestQuery("placementPassages", "status", "published", token),
-      ]);
-      const readingQuestions = questions.filter((item) => item.data.passageId === passageId);
-      if (readingQuestions.length > 0) {
-        return NextResponse.json({
-          questions: readingQuestions.map(({ id, data: question }) => ({
+      return NextResponse.json({
+        questions: (await getFirestoreRestQuery("questions", "passageId", passageId, token)).map(
+          ({ id, data: question }) => ({
             id,
-            passageVersion: question.passageVersion || requestedPassage?.data.version || 1,
+            passageVersion: question.passageVersion || 1,
             questionText: question.prompt || question.questionText || "",
             options: question.options || [],
             correctOptionId: question.correctAnswer || question.correctOptionId || "",
@@ -175,37 +168,8 @@ export async function GET(request: NextRequest) {
             explanation: question.explanation || "",
             questionType: question.targetSkill || question.questionType || "ana_fikir",
             status: question.status || "published",
-          })),
-        });
-      }
-
-      const publishedExams = exams.filter((item) => item.data.status === "published");
-      const requestedData = requestedPassage?.data;
-      const matchingExam = publishedExams.find((item) => {
-        if (item.data.passageId === passageId) return true;
-        const placementPassage = placementPassages.find(
-          (passage) => passage.id === item.data.passageId
-        );
-        return Boolean(
-          requestedData &&
-          placementPassage &&
-          (normalize(placementPassage.data.title) === normalize(requestedData.title) ||
-            normalize(placementPassage.data.content) === normalize(requestedData.content))
-        );
-      });
-      if (!matchingExam) return NextResponse.json({ questions: [] });
-      const placementQuestions = await getFirestoreRestQuery(
-        "placementQuestions",
-        "examId",
-        matchingExam.id,
-        token
-      );
-
-      return NextResponse.json({
-        questions: placementQuestions
-          .filter((item) => item.data.examId === matchingExam.id)
-          .sort((left, right) => Number(left.data.order || 0) - Number(right.data.order || 0))
-          .map(({ id, data }) => ({ id, ...data })),
+          })
+        ),
       });
     }
 

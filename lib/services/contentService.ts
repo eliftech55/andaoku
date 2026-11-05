@@ -268,5 +268,27 @@ export async function fetchQuestionsForPassage(
     console.warn("Yayınlanmış sınav soruları alınamadı, başlangıç soruları denenecek.");
   }
 
-  return SEED_QUESTIONS.filter((q) => q.passageId === passageId);
+  const seedPassage = SEED_PASSAGES.find((item) => item.id === passageId);
+  if (seedPassage) {
+    return SEED_QUESTIONS.filter((q) => q.passageId === passageId);
+  }
+
+  const passage = await fetchPassageById(passageId);
+  if (passage) {
+    const normalize = (value: string) =>
+      value.trim().toLocaleLowerCase("tr-TR").replace(/\s+/g, " ");
+    const matchingSeedPassage = SEED_PASSAGES.find(
+      (item) =>
+        normalize(item.title) === normalize(passage.title) ||
+        normalize(item.content) === normalize(passage.content)
+    );
+    if (matchingSeedPassage) {
+      return SEED_QUESTIONS.filter((q) => q.passageId === matchingSeedPassage.id).map((q) => ({
+        ...q,
+        passageId,
+      }));
+    }
+  }
+
+  return [];
 }
