@@ -220,29 +220,6 @@ export default function UserDashboardPage() {
         </Card>
       </div>
 
-      {/* KİŞİSELLEŞTİRİLMİŞ ÖNERİ & KALDIĞI YERDEN DEVAM ET */}
-      {recommendation && (
-        <div className="p-6 rounded-3xl bg-amber-50 border border-amber-200 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-          <div className="space-y-2 flex-1">
-            <div className="flex items-center gap-2">
-              <Badge variant="amber" className="flex items-center gap-1 text-[11px]">
-                <Sparkles className="h-3 w-3" />
-                ÖNERİLEN SONRAKİ ADIM
-              </Badge>
-              <span className="text-xs font-bold text-amber-900">{recommendation.title}</span>
-            </div>
-            <p className="text-xs sm:text-sm text-charcoal leading-relaxed">{recommendation.rationale}</p>
-          </div>
-
-          <Link href={recommendation.status === "insufficient_data" ? "/panel/baslangic-sinavi" : "/panel/okuma-laboratuvari"}>
-            <Button size="lg" variant="amber" className="font-bold shrink-0 shadow-md">
-              <Play className="mr-2 h-4 w-4" />
-              {recommendation.suggestedAction}
-            </Button>
-          </Link>
-        </div>
-      )}
-
       {/* GELİŞİM GRAFİKLERİ BÖLÜMÜ */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
@@ -287,14 +264,12 @@ export default function UserDashboardPage() {
             </Link>
           </div>
         </div>
-
         <div className="p-6 rounded-3xl bg-white border border-sage-200 shadow-sm space-y-4">
           <div className="flex items-center justify-between text-xs text-charcoal-muted">
             <span>Genel Yol İlerlemesi</span>
             <span className="font-bold text-brand-900">%{totalModules ? Math.round((completedModulesCount / totalModules) * 100) : 0}</span>
           </div>
           <Progress value={totalModules ? (completedModulesCount / totalModules) * 100 : 0} />
-
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 pt-2">
             {modules.map((module) => {
               const progress = progressList.find((item) => item.moduleId === module.id);
@@ -305,18 +280,10 @@ export default function UserDashboardPage() {
                 <span className="flex h-full flex-col justify-between gap-3">
                   <span className="flex items-start justify-between gap-2">
                     <span>
-                      <span className="block text-xs font-bold uppercase text-charcoal-muted">
-                        Modül {String(module.order).padStart(2, "0")}
-                      </span>
+                      <span className="block text-xs font-bold uppercase text-charcoal-muted">Modül {String(module.order).padStart(2, "0")}</span>
                       <span className="mt-1 block font-semibold text-charcoal">{module.title}</span>
                     </span>
-                    {isCompleted ? (
-                      <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
-                    ) : isUnlocked ? (
-                      <Play className="h-5 w-5 shrink-0 text-amber-700" />
-                    ) : (
-                      <Lock className="h-5 w-5 shrink-0 text-charcoal-muted" />
-                    )}
+                    {isCompleted ? <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" /> : isUnlocked ? <Play className="h-5 w-5 shrink-0 text-amber-700" /> : <Lock className="h-5 w-5 shrink-0 text-charcoal-muted" />}
                   </span>
                   <span className="flex items-center justify-between text-xs text-charcoal-muted">
                     <span>{isCompleted ? `Tamamlandı · %${progress?.overallScore || 0}` : isUnlocked ? "Çalışmaya başla" : "Ön koşul kilitli"}</span>
@@ -325,22 +292,39 @@ export default function UserDashboardPage() {
                 </span>
               );
               return isUnlocked ? (
-                <Link
-                  key={module.id}
-                  href={`/panel/ogrenme-yolu#module-${encodeURIComponent(module.id)}`}
-                  className={`rounded-2xl border p-4 transition-all hover:border-amber-400 ${isCompleted ? "border-emerald-200 bg-emerald-50/60" : "border-amber-300 bg-amber-50/60"}`}
-                >
+                <Link key={module.id} href={`/panel/ogrenme-yolu#module-${encodeURIComponent(module.id)}`} className={`rounded-2xl border p-4 transition-all hover:border-amber-400 ${isCompleted ? "border-emerald-200 bg-emerald-50/60" : "border-amber-300 bg-amber-50/60"}`}>
                   {content}
                 </Link>
               ) : (
-                <div key={module.id} aria-disabled="true" className="rounded-2xl border border-sage-200 bg-ivory-warm p-4 opacity-70">
-                  {content}
-                </div>
+                <div key={module.id} aria-disabled="true" className="rounded-2xl border border-sage-200 bg-ivory-warm p-4 opacity-70">{content}</div>
               );
             })}
           </div>
         </div>
       </div>
+
+      {/* KİŞİSELLEŞTİRİLMİŞ ÖNERİ & KALDIĞI YERDEN DEVAM ET */}
+      {recommendation && (
+        <div className="p-6 rounded-3xl bg-amber-50 border border-amber-200 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          <div className="space-y-2 flex-1">
+            <div className="flex items-center gap-2">
+              <Badge variant="amber" className="flex items-center gap-1 text-[11px]">
+                <Sparkles className="h-3 w-3" />
+                ÖNERİLEN SONRAKİ ADIM
+              </Badge>
+              <span className="text-xs font-bold text-amber-900">{recommendation.title}</span>
+            </div>
+            <p className="text-xs sm:text-sm text-charcoal leading-relaxed">{recommendation.rationale}</p>
+          </div>
+
+          <Link href={recommendation.status === "insufficient_data" ? "/panel/baslangic-sinavi" : "/panel/okuma-laboratuvari"}>
+            <Button size="lg" variant="amber" className="font-bold shrink-0 shadow-md">
+              <Play className="mr-2 h-4 w-4" />
+              {recommendation.suggestedAction}
+            </Button>
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
