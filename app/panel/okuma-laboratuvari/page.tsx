@@ -21,13 +21,29 @@ import {
 } from "@/lib/services/contentService";
 import { getUserProgressList } from "@/lib/firebase/firestore";
 import { useAuth } from "@/contexts/AuthContext";
-import { Activity, LearningModule, ReadingPassage, Question, UserProgress } from "@/lib/types";
+import {
+  Activity,
+  DifficultyLevel,
+  LearningModule,
+  ReadingPassage,
+  Question,
+  UserProgress,
+} from "@/lib/types";
 
 interface LabHistoryEntry {
   passageId: string;
   comprehensionScore: number;
   wpm: number;
   completedAt: string;
+}
+
+function moduleDifficulty(module: LearningModule | null, moduleId: string | null): DifficultyLevel | null {
+  const order = module?.order || Number(moduleId?.match(/\d+/)?.[0]);
+  if (!order) return null;
+  if (order <= 2) return "beginner";
+  if (order <= 4) return "intermediate";
+  if (order <= 6) return "advanced";
+  return null;
 }
 
 const LAB_HISTORY_PREFIX = "andaoku_lab_history";
@@ -97,25 +113,47 @@ function OkumaLaboratuvariContent() {
 
         const exerciseList = await fetchExerciseContent();
         const list = exerciseList.map((content) => content.passage);
-        const hasRequestedContent = Boolean(moduleId || activityId || searchParams.get("passageId"));
+        const hasRequestedContent = Boolean(activityId || searchParams.get("passageId"));
         const eligiblePassages = !user && !profile
           ? list.filter((passage) => passage.difficulty === "beginner")
           : list;
         const storedHistory = typeof window !== "undefined"
           ? JSON.parse(localStorage.getItem(historyKey) || "[]") as LabHistoryEntry[]
           : [];
-        const completedIds = new Set(storedHistory.map((entry) => entry.passageId));
-        const unseenPassages = eligiblePassages.filter((passage) => !completedIds.has(passage.id));
-        const randomUnseen = unseenPassages.length > 0
+        const requestedDifficulty = moduleDifficulty(module, moduleId);
+        const modulePassages = requestedDifficulty
+          ? list.filter((passage) => passage.difficulty === requestedDifficulty)
+          : eligiblePassages;
+        const selectionPool = moduleId ? modulePassages : eligiblePassages;
+        const historyByPassage = new Map(
+          storedHistory.map((entry) => [entry.passageId, entry])
+        );
+        const unseenPassages = selectionPool.filter(
+          (passage) => !historyByPassage.has(passage.id)
+        );
+        const lowestScore = selectionPool.reduce(
+          (lowest, passage) => Math.min(lowest, historyByPassage.get(passage.id)?.comprehensionScore ?? 0),
+          100
+        );
+        const lowestScorePassages = selectionPool.filter(
+          (passage) => (historyByPassage.get(passage.id)?.comprehensionScore ?? 0) === lowestScore
+        );
+        const randomCandidate = unseenPassages.length > 0
           ? unseenPassages[Math.floor(Math.random() * unseenPassages.length)]
-          : null;
-        const availableList = hasRequestedContent
+          : lowestScorePassages[Math.floor(Math.random() * lowestScorePassages.length)] || null;
+        const availableList = moduleId
+          ? randomCandidate
+            ? [randomCandidate]
+            : selectionPool
+          : hasRequestedContent
           ? list
-          : randomUnseen
-            ? [randomUnseen]
+          : randomCandidate
+            ? [randomCandidate]
             : eligiblePassages;
         if (active) setLabHistory(storedHistory);
-        const requestedPassageId = activity?.contentConfig.passageId || searchParams.get("passageId");
+        const requestedPassageId = moduleId
+          ? null
+          : activity?.contentConfig.passageId || searchParams.get("passageId");
         let target: ReadingPassage | null = requestedPassageId
           ? availableList.find((passage) => passage.id === requestedPassageId) || null
           : availableList[0] || null;
@@ -133,9 +171,9 @@ function OkumaLaboratuvariContent() {
         }
         setQuestionsLoading(true);
         const exerciseContent = exerciseList.find((content) => content.passage.id === target.id);
-        const configuredQuestionIds = activity?.assessmentConfig?.questionIds
-          || activityList.find((item) => item.contentConfig.passageId === target.id)
-            ?.assessmentConfig?.questionIds;
+        const configuredQuestionIds = activityList.find(
+          (item) => item.contentConfig.passageId === target.id
+        )?.assessmentConfig?.questionIds || activity?.assessmentConfig?.questionIds;
         const accessToken = user ? await user.getIdToken() : undefined;
         const qList = exerciseContent?.questions.length
           ? exerciseContent.questions
@@ -192,9 +230,8 @@ function OkumaLaboratuvariContent() {
         readingScore: Math.max(current?.readingScore || 0, result.comprehensionScore),
         lastActivityAt: new Date().toISOString(),
       }));
-      return;
     }
-    if (!selectedPassage || searchParams.get("activityId")) return;
+    if (!selectedPassage) return;
     const nextEntry = {
       passageId: selectedPassage.id,
       comprehensionScore: result.comprehensionScore,
