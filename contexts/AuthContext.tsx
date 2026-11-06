@@ -136,6 +136,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfile(null);
     if (typeof window !== "undefined") {
       localStorage.removeItem("andaoku_demo_profile");
+      window.location.assign("/");
     }
   };
 
