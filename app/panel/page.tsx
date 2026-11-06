@@ -220,18 +220,6 @@ export default function UserDashboardPage() {
         </Card>
       </div>
 
-      {/* GELİŞİM GRAFİKLERİ BÖLÜMÜ */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold font-serif text-charcoal">Ölçüm ve Gelişim Geçmişi</h2>
-          <Link href="/panel/gelisim" className="text-xs font-semibold text-brand-800 hover:underline flex items-center gap-1">
-            Detaylı Raporları İncele
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        </div>
-        <ProgressCharts assessmentResults={assessmentResults} />
-      </div>
-
       {assignments.length > 0 && (
         <section className="space-y-4">
           <div className="flex items-center justify-between">
@@ -325,6 +313,18 @@ export default function UserDashboardPage() {
           </Link>
         </div>
       )}
+
+      {/* GELİŞİM GRAFİKLERİ BÖLÜMÜ */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold font-serif text-charcoal">Ölçüm ve Gelişim Geçmişi</h2>
+          <Link href="/panel/gelisim" className="text-xs font-semibold text-brand-800 hover:underline flex items-center gap-1">
+            Detaylı Raporları İncele
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+        <ProgressCharts assessmentResults={assessmentResults} />
+      </div>
     </div>
   );
 }
