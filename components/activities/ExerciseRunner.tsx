@@ -611,7 +611,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   }, [flashIndex, flashStage, kind, memoryPalaceRoundConfig, memoryPalaceRounds, phase]);
 
   useEffect(() => {
-    if (phase !== "playing" || !["word_memory", "chunk_reading", "passage_memory", "digit_memory"].includes(kind) || flashStage !== "show") return;
+    if (phase !== "playing" || !["flash_words", "word_memory", "chunk_reading", "passage_memory", "digit_memory"].includes(kind) || flashStage !== "show") return;
     const displayDuration = kind === "word_memory"
       ? wordMemoryDuration
       : kind === "digit_memory"
@@ -1401,7 +1401,12 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
             <p className="text-xs text-charcoal-muted">{flashWordRounds[flashIndex].words.length} kelime</p>
             {flashStage === "show" ? (
               <>
-                <p className="text-sm font-semibold text-charcoal">Bu kelimeleri aklınızda tutun.</p>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-charcoal">Bu kelimeleri aklınızda tutun.</p>
+                  <span className="rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-sm font-bold tabular-nums text-amber-900" aria-live="polite">
+                    {flashCountdown} sn
+                  </span>
+                </div>
                 <div aria-live="polite" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                   {flashWordRounds[flashIndex].words.map((word) => (
                     <div key={word} className="rounded-lg border border-amber-200 bg-white px-3 py-3 text-lg font-bold text-brand-900">{word}</div>
