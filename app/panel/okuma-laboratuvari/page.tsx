@@ -1,6 +1,7 @@
 "use client";
 
 import React, { Suspense, useState, useEffect } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ReadingLab } from "@/components/reading/ReadingLab";
 import { VisualAttentionGame } from "@/components/activities/VisualAttentionGame";
@@ -24,6 +25,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   Activity,
   DifficultyLevel,
+  ExerciseKind,
   LearningModule,
   ReadingPassage,
   Question,
@@ -76,6 +78,7 @@ function OkumaLaboratuvariContent() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [questionsLoading, setQuestionsLoading] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
+  const [moduleActivities, setModuleActivities] = useState<Activity[]>([]);
   const [selectedEyeExercise, setSelectedEyeExercise] =
     useState<"matrix" | EyeMovementExerciseType>("matrix");
   const [requestedModuleId, setRequestedModuleId] = useState<string | null>(null);
@@ -106,6 +109,36 @@ function OkumaLaboratuvariContent() {
           : [];
         const activity = activityList.find((item) => item.id === activityId) || null;
         if (active) setSelectedActivity(activity);
+        if (active) {
+          setModuleActivities(
+            activityList.filter(
+              (item) =>
+                item.status === "published" &&
+                (item.type === "visual_attention" ||
+                  item.contentConfig.exerciseKind ||
+                  [
+                    "peripheral_vision",
+                    "target_scan",
+                    "eye_saccade",
+                    "flash_words",
+                    "point_tracking",
+                    "infinity_tracking",
+                    "chunk_reading",
+                    "pacer_reading",
+                    "schulte_table",
+                    "regression_prevention",
+                    "digit_memory",
+                    "word_memory",
+                    "matching_cards",
+                    "sequence_memory",
+                    "passage_memory",
+                    "memory_palace",
+                    "n_back",
+                    "visual_change",
+                  ].includes(item.type as ExerciseKind))
+            )
+          );
+        }
         if (active) {
           setSelectedModule(module);
           setModuleProgress(progressList.find((item) => item.moduleId === moduleId) || null);
@@ -404,7 +437,39 @@ function OkumaLaboratuvariContent() {
       ) : (
         <div className="space-y-6">
           <div className="grid gap-3 sm:grid-cols-3" aria-label="Göz egzersizi seçin">
-            {[
+            {requestedModuleId && moduleActivities.length > 0
+              ? moduleActivities.map((exercise) =>
+                exercise.type === "visual_attention" ? (
+                  <button
+                    key={exercise.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedActivity(exercise);
+                      setSelectedEyeExercise("matrix");
+                    }}
+                    className="rounded-2xl border border-sage-200 bg-white p-4 text-left transition-colors hover:border-brand-700 hover:bg-brand-50"
+                  >
+                    <span className="block text-sm font-bold text-charcoal">{exercise.title}</span>
+                    <span className="mt-1 block text-xs text-charcoal-muted">{exercise.description}</span>
+                    <span className="mt-3 inline-block rounded-full bg-sage-100 px-2.5 py-1 text-[10px] font-semibold text-charcoal">
+                      Egzersizi başlat
+                    </span>
+                  </button>
+                ) : (
+                  <Link
+                    key={exercise.id}
+                    href={`/panel/egzersizler/${encodeURIComponent(exercise.id)}`}
+                    className="rounded-2xl border border-sage-200 bg-white p-4 text-left transition-colors hover:border-brand-700 hover:bg-brand-50"
+                  >
+                    <span className="block text-sm font-bold text-charcoal">{exercise.title}</span>
+                    <span className="mt-1 block text-xs text-charcoal-muted">{exercise.description}</span>
+                    <span className="mt-3 inline-block rounded-full bg-sage-100 px-2.5 py-1 text-[10px] font-semibold text-charcoal">
+                      {exercise.level ? `Seviye ${exercise.level}` : "Egzersizi başlat"}
+                    </span>
+                  </Link>
+                )
+              )
+              : [
               {
                 id: "matrix" as const,
                 title: "Görsel Dikkat Matrisi",
