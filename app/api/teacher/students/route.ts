@@ -33,9 +33,15 @@ export async function GET(request: NextRequest) {
 async function teacherId(request: NextRequest) {
   const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (!token || !adminAuth || !adminDb) return null;
-  const decoded = await adminAuth.verifyIdToken(token);
-  const profile = await adminDb.collection("users").doc(decoded.uid).get();
-  return profile.data()?.role === "teacher" || profile.data()?.role === "admin" ? decoded.uid : null;
+  try {
+    const decoded = await adminAuth.verifyIdToken(token);
+    const profile = await adminDb.collection("users").doc(decoded.uid).get();
+    const role = profile.data()?.role ?? decoded.role;
+    return role === "teacher" || role === "admin" ? decoded.uid : null;
+  } catch (error) {
+    console.error("Öğretmen Firebase oturumu doğrulanamadı:", error);
+    return null;
+  }
 }
 
 async function ownsClass(uid: string, classId: string) {
