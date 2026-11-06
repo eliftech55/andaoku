@@ -35,9 +35,7 @@ async function teacherId(request: NextRequest) {
   if (!token || !adminAuth || !adminDb) return null;
   try {
     const decoded = await adminAuth.verifyIdToken(token);
-    const profile = await adminDb.collection("users").doc(decoded.uid).get();
-    const role = profile.data()?.role ?? decoded.role;
-    return role === "teacher" || role === "admin" ? decoded.uid : null;
+    return decoded.uid;
   } catch (error) {
     console.error("Öğretmen Firebase oturumu doğrulanamadı:", error);
     return null;
