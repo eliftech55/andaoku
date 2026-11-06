@@ -155,6 +155,9 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       180,
       Math.max(["word_memory", "passage_memory", "memory_palace"].includes(kind) ? 75 : 10, activity.contentConfig.timeLimitSeconds || 60)
     );
+  const saccadeTargetLimitMs = [3500, 3000, 2500, 2000, 1500][
+    Math.min(5, Math.max(1, activity.level || 1)) - 1
+  ];
   const sequenceLength = Math.min(20, Math.max(3, activity.contentConfig.sequenceLength || 4));
   const flashDuration = kind === "flash_words"
     ? FLASH_WORD_DURATIONS[Math.min(5, Math.max(1, activity.level || 1)) - 1]
@@ -178,6 +181,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   const [wrongCells, setWrongCells] = useState<number[]>([]);
   const [sequence, setSequence] = useState<number[]>([]);
   const [sequenceIndex, setSequenceIndex] = useState(0);
+  const [saccadeTimeLeftMs, setSaccadeTimeLeftMs] = useState(saccadeTargetLimitMs);
   const [saccadeError, setSaccadeError] = useState(false);
   const [flashRounds, setFlashRounds] = useState<FlashRound[]>([]);
   const [flashWordRounds, setFlashWordRounds] = useState<FlashWordRound[]>([]);
@@ -214,6 +218,15 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   const [wordMemoryInputs, setWordMemoryInputs] = useState<string[]>([]);
   const [correctAnswers, setCorrectAnswers] = useState(0);
   const [summary, setSummary] = useState<ExerciseResult | null>(null);
+  // Exam handling for passage_memory and pacer_reading
+  const [examStage, setExamStage] = useState<"none" | "questions" | "finished">("none");
+  const sampleQuestions = Array.from({ length: 10 }, (_, i) => ({
+    id: i,
+    text: `Soru ${i + 1}: Bu pasajdaki ${i + 1}. kelime ne?`,
+    answer: "",
+  }));
+  const [questions, setQuestions] = useState(sampleQuestions);
+
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savePending, setSavePending] = useState(false);
   const startedAt = useRef<number>(0);
@@ -301,6 +314,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     setMazeStep(0);
     setSchulteExpected("A");
     setTimeLeft(durationLimit);
+    setSaccadeTimeLeftMs(saccadeTargetLimitMs);
     startedAt.current = Date.now();
 
     if (kind === "peripheral_vision" || kind === "target_scan") {
@@ -652,6 +666,33 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     return () => window.clearTimeout(timer);
   }, [phase, timeLeft]);
 
+  useEffect(() => {
+    if (phase !== "playing" || kind !== "eye_saccade" || sequenceIndex >= sequence.length) {
+      return;
+    }
+
+    const deadline = Date.now() + saccadeTargetLimitMs;
+    let timedOut = false;
+    const updateRemaining = () => {
+      const remaining = Math.max(0, deadline - Date.now());
+      setSaccadeTimeLeftMs(remaining);
+      if (remaining === 0 && !timedOut) {
+        timedOut = true;
+        wrongRef.current += 1;
+        setSaccadeError(true);
+        const next = sequenceIndex + 1;
+        setSequenceIndex(next);
+        if (next === sequence.length) {
+          finish(correctRef.current, wrongRef.current, sequence.length);
+        }
+      }
+    };
+
+    updateRemaining();
+    const timer = window.setInterval(updateRemaining, 100);
+    return () => window.clearInterval(timer);
+  }, [kind, phase, saccadeTargetLimitMs, sequence.length, sequenceIndex]);
+
   const handleGridClick = (index: number) => {
     if (phase !== "playing" || selectedCells.includes(index) || wrongCells.includes(index)) return;
     if (targets.includes(index)) {
@@ -689,12 +730,14 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
 
   const handleSaccadeClick = (index: number) => {
     if (phase !== "playing") return;
+    if (saccadeTimeLeftMs <= 0) return;
     if (index !== sequence[sequenceIndex]) {
       wrongRef.current += 1;
       setSaccadeError(true);
       return;
     }
     setSaccadeError(false);
+    setSaccadeTimeLeftMs(saccadeTargetLimitMs);
     const next = sequenceIndex + 1;
     setSequenceIndex(next);
     correctRef.current = next;
@@ -764,12 +807,39 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     if (phase !== "playing" || !["pacer_reading", "regression_prevention"].includes(kind)) return;
     const wordsInRound = pacerRounds[flashIndex]?.lines ?? [];
     if (pacerWordIndex + 1 >= wordsInRound.length) {
-      completeRound(true);
+      // Transition to exam stage instead of finishing round directly
+      setExamStage("questions");
       setPacerWordIndex(0);
     } else {
       setPacerWordIndex((current) => current + 1);
     }
   };
+
+  // Exam helpers for passage_memory and pacer_reading
+  const updateAnswer = (id: number, value: string) => {
+    setQuestions((qs) => qs.map((q) => (q.id === id ? { ...q, answer: value } : q)));
+  };
+
+  const handleExamSubmit = () => {
+    const correct = questions.filter((q) => q.answer.trim() !== "").length;
+    const total = questions.length;
+    const score = Math.round((correct / total) * 100);
+    const result: ExerciseResult = {
+      score,
+      correctCount: correct,
+      totalCount: total,
+      durationSeconds: Math.max(1, Math.round((Date.now() - startedAt.current) / 1000)),
+    };
+    setSummary(result);
+    setExamStage("finished");
+    setPhase("finished");
+  };
+
+  // Start exam after passage_memory reading finishes
+  useEffect(() => {
+    if (phase !== "playing" || kind !== "passage_memory" || flashStage !== "choose") return;
+    setExamStage("questions");
+  }, [phase, kind, flashStage]);
 
   const handleNBackAnswer = (matches: boolean) => {
     if (phase !== "playing" || kind !== "n_back" || !nBackRound || nBackIndex < nBackRound.n) return;
@@ -1059,7 +1129,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
 
   const title = activity.title;
   const instructions = kind === "eye_saccade"
-    ? "3×3 alanda her turda yalnızca sarı noktaya tıklayın. Sarı nokta her doğru tıklamadan sonra başka bir konuma geçer; beyaz noktalara tıklamayın."
+    ? `3×3 alanda sarı noktaya tıklayın. Her hedef için ${Math.round(saccadeTargetLimitMs / 100) / 10} saniyeniz var; süre dolarsa hata sayılır ve sıradaki hedefe geçilir.`
     : activity.instructions;
   const progressCount = kind === "eye_saccade" ? sequenceIndex : FLASH_LIKE_KINDS.includes(kind) ? correctAnswers : selectedCells.length;
   const roundNumber = kind === "eye_saccade"
@@ -1237,13 +1307,14 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
               <ol className="mt-1 list-inside list-decimal space-y-1">
                 <li>3×3 alanda sarı noktayı bulun.</li>
                 <li>Sarı noktaya tıklayın; beyaz noktalara tıklamayın.</li>
+                <li>Her hedefi süre dolmadan tamamlayın; süre dolarsa hata sayılır.</li>
                 <li>Yeni sarı nokta başka bir yerde görünür. 5 tur tamamlanana kadar tekrarlayın.</li>
               </ol>
               <p className="mt-2 text-xs">Amaç, gözlerinizi farklı konumlara hızlıca taşıyıp doğru hedefi seçmektir. Başınızı sabit tutmaya çalışın.</p>
             </div>
             <div className="flex items-center justify-between text-sm text-charcoal-muted">
               <span>Hedef {sequenceIndex + 1}/{sequence.length}</span>
-              <span>{sequenceIndex} doğru · {wrongRef.current} yanlış</span>
+              <span>{sequenceIndex} doğru · {wrongRef.current} yanlış · {(saccadeTimeLeftMs / 1000).toFixed(1)} sn hedef süresi</span>
             </div>
             {saccadeError && <p role="alert" className="text-sm font-semibold text-rose-700">Bu nokta sıradaki hedef değil. Sarı noktaya tıklayın.</p>}
             <div className="flex items-center justify-center gap-4 text-xs text-charcoal-muted">
