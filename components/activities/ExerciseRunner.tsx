@@ -251,7 +251,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
         ? Math.min(100, Math.round((matchingMatchesRef.current / matchingMovesRef.current) * 200))
         : 0
       : total > 0
-        ? Math.round((correct / total) * 100)
+        ? Math.min(100, Math.round((correct / total) * 100))
         : 0;
     const result = {
       score,
@@ -1124,7 +1124,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
 
     const next = flashIndex + 1;
     if (next >= wordMemoryRounds.length) {
-      finish(correctRef.current, wrongRef.current, wordMemoryRounds.length);
+      finish(correctRef.current, wrongRef.current, wordMemoryRounds.length * expected.length);
       return;
     }
     setFlashIndex(next);
