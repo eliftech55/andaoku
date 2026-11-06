@@ -19,6 +19,12 @@ function canGenerateContent(role: unknown): boolean {
   return role === "admin" || role === "content_manager";
 }
 
+function canGenerateFromClaims(claims: unknown): boolean {
+  if (typeof claims !== "object" || claims === null) return false;
+  const values = claims as Record<string, unknown>;
+  return values.admin === true || values.content_manager === true || canGenerateContent(values.role);
+}
+
 function isModelCapacityError(error: unknown): boolean {
   return (
     error instanceof Error &&
@@ -143,7 +149,7 @@ async function verifyAdmin(idToken: string): Promise<boolean> {
   if (adminAuth && adminDb) {
     try {
       const decodedToken = await adminAuth.verifyIdToken(idToken);
-      if (canGenerateContent(decodedToken.role)) return true;
+      if (canGenerateFromClaims(decodedToken)) return true;
 
       const profile = await adminDb.collection("users").doc(decodedToken.uid).get();
       return canGenerateContent(profile.data()?.role);
