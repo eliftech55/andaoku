@@ -26,6 +26,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ classId, students });
   } catch (error) {
     console.error("Öğrenci kullanıcı adı sorgusu:", error);
+    if (typeof error === "object" && error !== null && "code" in error && String(error.code) === "8") {
+      return NextResponse.json({ error: "Firebase Firestore kullanım kotası doldu. Firebase Console'dan kota/billing ayarlarını kontrol edin veya kota yenilenmesini bekleyin." }, { status: 503 });
+    }
     return NextResponse.json({ error: "Öğrenci bilgileri alınamadı." }, { status: 500 });
   }
 }
@@ -123,6 +126,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 503 });
     }
     const code = typeof error === "object" && error && "code" in error ? String(error.code) : "";
+    if (code === "8") {
+      return NextResponse.json({ error: "Firebase Firestore kullanım kotası doldu. Firebase Console'dan kota/billing ayarlarını kontrol edin veya kota yenilenmesini bekleyin." }, { status: 503 });
+    }
     const errorMessage = code === "auth/email-already-exists" ? "Bu e-posta adresi zaten kullanılıyor." : "Öğrenci işlemi tamamlanamadı.";
     console.error("Teacher student API:", error);
     return NextResponse.json({ error: errorMessage }, { status: 500 });
