@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ const KIND_LABELS: Record<ExerciseKind, string> = {
 };
 
 export default function StudentExercisesPage() {
+  const searchParams = useSearchParams();
   const { user, profile, loading: authLoading } = useAuth();
   const [modules, setModules] = useState<LearningModule[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -41,6 +43,16 @@ export default function StudentExercisesPage() {
   const [progress, setProgress] = useState<UserProgress[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const requestedModuleId = searchParams.get("moduleId");
+
+  useEffect(() => {
+    if (!requestedModuleId || loading || modules.length === 0) return;
+    const moduleElement = document.getElementById(`exercise-module-${requestedModuleId}`);
+    if (!moduleElement) return;
+    requestAnimationFrame(() => {
+      moduleElement.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [requestedModuleId, loading, modules]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -114,7 +126,7 @@ export default function StudentExercisesPage() {
           .sort((left, right) => (left.level || 0) - (right.level || 0));
         const moduleProgress = progress.find((item) => item.moduleId === module.id);
         return (
-          <Card key={module.id} className="border-sage-200">
+          <Card id={`exercise-module-${module.id}`} key={module.id} className="scroll-mt-6 border-sage-200">
             <CardHeader>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <CardTitle className="font-serif">{module.title}</CardTitle>
