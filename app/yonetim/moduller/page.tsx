@@ -414,7 +414,7 @@ export default function ModuleManagementPage() {
                   Okuma metni: {passages.find((passage) => passage.id === module.readingPassageId)?.title || "Henüz atanmamış"}
                 </p>
                 <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-charcoal-muted">
-                  {module.exerciseTypes?.filter((kind) => AVAILABLE_EXERCISE_KINDS.includes(kind)).map((kind) => (
+                  {module.exerciseTypes?.filter((kind) => AVAILABLE_EXERCISE_KINDS.includes(kind)).length ? module.exerciseTypes.filter((kind) => AVAILABLE_EXERCISE_KINDS.includes(kind)).map((kind) => (
                     <li key={kind}>
                       {EXERCISE_LABELS[kind]}: Seviye {(module.exerciseLevels?.[kind] || []).join(", ") || "atanmamış"}
                     </li>
@@ -422,7 +422,7 @@ export default function ModuleManagementPage() {
                 </ul>
               </div>
               <div className="flex shrink-0 flex-col items-start gap-2 text-xs text-charcoal-muted sm:items-end">
-                <span>{module.exerciseTypes?.length || 0} egzersiz türü atanmış</span>
+                <span>{module.exerciseTypes?.filter((kind) => AVAILABLE_EXERCISE_KINDS.includes(kind)).length || 0} egzersiz türü atanmış</span>
                 <Link href={`/yonetim/moduller/egzersiz-sec?moduleId=${encodeURIComponent(module.id)}`}>
                   <Button size="sm" variant="outline"><Eye className="mr-1.5 h-4 w-4" />İçerik ve egzersizleri düzenle</Button>
                 </Link>

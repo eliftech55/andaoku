@@ -12,9 +12,13 @@ import {
   saveExerciseDefinition,
 } from "@/lib/firebase/firestore";
 import { ExerciseDefinition, ExerciseKind } from "@/lib/types";
+import {
+  AVAILABLE_EXERCISE_KINDS,
+  EXERCISE_KINDS_BY_DIFFICULTY,
+} from "@/lib/services/exerciseCatalog";
 import { CheckCircle2, Eye, LoaderCircle, Save } from "lucide-react";
 
-const KIND_LABELS: Record<ExerciseKind, string> = {
+const KIND_LABELS: Partial<Record<ExerciseKind, string>> = {
   peripheral_vision: "Çevresel Görüş",
   target_scan: "Hedef ve Harf Tarama",
   eye_saccade: "Göz Sıçraması",
@@ -35,7 +39,18 @@ const KIND_LABELS: Record<ExerciseKind, string> = {
   visual_change: "Neyin Değişti?",
 };
 
-const KIND_ORDER = Object.keys(KIND_LABELS) as ExerciseKind[];
+const KIND_ORDER = AVAILABLE_EXERCISE_KINDS;
+const DIFFICULTY_LABELS = {
+  beginner: "Kolay",
+  intermediate: "Orta",
+  advanced: "Zor",
+} as const;
+const DIFFICULTY_ORDER = ["beginner", "intermediate", "advanced"] as const;
+const EXERCISE_DIFFICULTY = Object.fromEntries(
+  DIFFICULTY_ORDER.flatMap((difficulty) =>
+    EXERCISE_KINDS_BY_DIFFICULTY[difficulty].map((kind) => [kind, difficulty])
+  )
+) as Record<ExerciseKind, keyof typeof DIFFICULTY_LABELS>;
 
 export default function ExerciseManagementPage() {
   const { profile, loading: authLoading } = useAuth();
@@ -73,7 +88,7 @@ export default function ExerciseManagementPage() {
     try {
       await initializeExerciseCatalog();
       await loadDefinitions();
-      setNotice("Dört egzersiz türünün beşer seviyesi kataloğa eklendi. Var olan ayarlar korunmuştur.");
+      setNotice("Mevcut egzersiz türlerinin beşer seviyesi kataloğa eklendi. Var olan ayarlar korunmuştur.");
     } catch (initializeError) {
       console.error("Egzersiz kataloğu oluşturulamadı:", initializeError);
       setError("Egzersiz kataloğu oluşturulamadı. Firestore yazma erişimini kontrol edin.");
@@ -113,7 +128,7 @@ export default function ExerciseManagementPage() {
   const grouped = KIND_ORDER.map((kind) => ({
     kind,
     items: definitions.filter((definition) => definition.kind === kind).sort((a, b) => a.level - b.level),
-  }));
+  })).filter(({ items }) => items.length > 0);
 
   return (
     <div className="container mx-auto max-w-5xl space-y-8 px-4 py-10 sm:px-6 lg:px-8">
@@ -121,7 +136,7 @@ export default function ExerciseManagementPage() {
         <div>
           <Badge variant="amber" className="mb-1">Eğitsel İçerik</Badge>
           <h1 className="text-3xl font-extrabold font-serif text-charcoal">Egzersiz Yönetimi</h1>
-          <p className="text-sm text-charcoal-muted">Dört göz/okuma egzersizi türünü ve kolaydan zora beş seviyesini düzenleyin.</p>
+          <p className="text-sm text-charcoal-muted">Kolaydan zora sıralanmış egzersiz türlerini ve her türün beş seviyesini düzenleyin.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href="/yonetim">
@@ -137,10 +152,14 @@ export default function ExerciseManagementPage() {
       {notice && <p role="status" className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900"><CheckCircle2 className="h-4 w-4" />{notice}</p>}
 
       {definitions.length === 0 ? (
-        <Card><CardContent className="p-6 text-sm text-charcoal-muted">Katalog henüz oluşturulmadı. Dört egzersizin tüm seviyelerini Firestore’a eklemek için yukarıdaki düğmeyi kullanın.</CardContent></Card>
-      ) : grouped.map(({ kind, items }) => (
+        <Card><CardContent className="p-6 text-sm text-charcoal-muted">Katalog henüz oluşturulmadı. Egzersiz türlerinin tüm seviyelerini Firestore’a eklemek için yukarıdaki düğmeyi kullanın.</CardContent></Card>
+      ) : DIFFICULTY_ORDER.flatMap((difficulty) =>
+        grouped.filter(({ kind }) => EXERCISE_DIFFICULTY[kind] === difficulty).map(({ kind, items }) => (
         <section key={kind} className="space-y-3">
-          <h2 className="text-xl font-bold font-serif text-charcoal">{KIND_LABELS[kind]}</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold font-serif text-charcoal">{KIND_LABELS[kind]}</h2>
+            <Badge variant="outline">{DIFFICULTY_LABELS[difficulty]}</Badge>
+          </div>
           {items.map((definition) => (
             <Card key={definition.id} className="border-sage-200">
               <CardHeader className="pb-2">
@@ -197,7 +216,8 @@ export default function ExerciseManagementPage() {
           ))}
           {items.length !== 5 && <p className="text-sm text-amber-800">Bu egzersiz türünde 5 seviye yok. Kataloğu oluştur/eksik seviyeleri ekle düğmesini kullanın.</p>}
         </section>
-      ))}
+        ))
+      )}
     </div>
   );
 }
