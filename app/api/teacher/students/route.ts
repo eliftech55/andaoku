@@ -4,6 +4,32 @@ import { normalizeStudentUsername, studentLoginEmail } from "@/lib/studentCreden
 
 export const runtime = "nodejs";
 
+export async function GET(request: NextRequest) {
+  try {
+    if (!adminDb) return NextResponse.json({ error: "Veritabanı yapılandırılmamış." }, { status: 503 });
+    const classCode = request.nextUrl.searchParams.get("classCode")?.trim().toUpperCase();
+    const username = request.nextUrl.searchParams.get("username");
+    if (!classCode) return NextResponse.json({ error: "Sınıf kodu gerekli." }, { status: 400 });
+    const classSnapshot = await adminDb.collection("classes").where("classCode", "==", classCode).limit(1).get();
+    if (classSnapshot.empty) return NextResponse.json({ error: "Sınıf bulunamadı." }, { status: 404 });
+    const classId = classSnapshot.docs[0].id;
+    const memberships = await adminDb.collection("classMemberships")
+      .where("classId", "==", classId).where("status", "==", "active").get();
+    const students = memberships.docs.map((doc) => {
+      const data = doc.data();
+      return { id: doc.id, username: data.studentUsername, name: data.studentName };
+    }).filter((student) => typeof student.username === "string" && student.username);
+    if (username) {
+      const normalized = normalizeStudentUsername(username);
+      return NextResponse.json({ available: !students.some((student) => student.username === normalized) });
+    }
+    return NextResponse.json({ classId, students });
+  } catch (error) {
+    console.error("Öğrenci kullanıcı adı sorgusu:", error);
+    return NextResponse.json({ error: "Öğrenci bilgileri alınamadı." }, { status: 500 });
+  }
+}
+
 async function teacherId(request: NextRequest) {
   const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (!token || !adminAuth || !adminDb) return null;
@@ -57,10 +83,22 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "update") {
-      if (!membershipId || !studentId || !name || !email) return NextResponse.json({ error: "Öğrenci bilgileri eksik." }, { status: 400 });
-      await adminAuth!.updateUser(studentId, { email, displayName: name, ...(password ? { password } : {}) });
-      await adminDb!.collection("users").doc(studentId).update({ displayName: name, email, updatedAt: new Date().toISOString() });
-      await adminDb!.collection("classMemberships").doc(membershipId).update({ studentName: name, studentEmail: email });
+      if (!membershipId || !studentId || !name || !username) return NextResponse.json({ error: "Öğrenci bilgileri eksik." }, { status: 400 });
+      const normalizedUsername = normalizeStudentUsername(String(username));
+      const duplicate = await adminDb!.collection("classMemberships").where("classId", "==", classId).where("studentUsername", "==", normalizedUsername).get();
+      if (duplicate.docs.some((doc) => doc.id !== membershipId)) return NextResponse.json({ error: "Bu kullanıcı adı sınıfta zaten kullanılıyor." }, { status: 409 });
+      const studentEmail = studentLoginEmail(classId, normalizedUsername);
+      await adminAuth!.updateUser(studentId, { email: studentEmail, displayName: name, ...(password ? { password } : {}) });
+      await adminDb!.collection("users").doc(studentId).update({ displayName: name, email: studentEmail, updatedAt: new Date().toISOString() });
+      await adminDb!.collection("classMemberships").doc(membershipId).update({ studentName: name, studentUsername: normalizedUsername });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "resetPassword") {
+      if (!membershipId || !studentId || !password || String(password).length < 6) {
+        return NextResponse.json({ error: "En az 6 karakterli yeni parola zorunludur." }, { status: 400 });
+      }
+      await adminAuth!.updateUser(studentId, { password: String(password) });
       return NextResponse.json({ ok: true });
     }
 
