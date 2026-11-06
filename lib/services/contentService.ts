@@ -246,9 +246,31 @@ export async function fetchQuestionsForPassage(
       }));
     }
 
-    const exam = (await getAllPlacementExams()).find((item) => item.passageId === passageId);
-    if (exam) {
-      const placementQuestions = await getStudentPlacementQuestions(exam.code);
+    const matchingPackage = packages.find(
+      (item) =>
+        item.exam.passageId === passageId ||
+        (passage &&
+          (normalize(item.passage.title) === normalize(passage.title) ||
+            normalize(item.passage.content) === normalize(passage.content)))
+    );
+    const matchingExam = matchingPackage?.exam ||
+      (await getAllPlacementExams()).find((item) => item.passageId === passageId) ||
+      (passage
+        ? (
+            await Promise.all(
+              (await getAllPlacementExams()).map(async (item) => {
+                const placementPassage = await getPlacementPassageById(item.passageId);
+                if (!placementPassage) return null;
+                return normalize(placementPassage.title) === normalize(passage.title) ||
+                  normalize(placementPassage.content) === normalize(passage.content)
+                  ? item
+                  : null;
+              })
+            )
+          ).find((item): item is NonNullable<typeof item> => item !== null)
+        : undefined);
+    if (matchingExam) {
+      const placementQuestions = await getStudentPlacementQuestions(matchingExam.code);
       if (placementQuestions.length > 0) {
         return placementQuestions.map((question) => ({
           id: question.id,

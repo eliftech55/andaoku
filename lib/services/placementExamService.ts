@@ -267,16 +267,16 @@ export async function getQuestionsByExamCode(
       const qQuery = publishedOnly
         ? query(
             qRef,
-            where("examId", "==", examCode),
-            where("status", "==", "published"),
-            orderBy("order", "asc")
+            where("examId", "==", examCode)
           )
         : query(qRef, where("examId", "==", examCode), orderBy("order", "asc"));
       const snapshot = await getDocs(qQuery);
       if (!snapshot.empty) {
         const list: PlacementQuestion[] = [];
         snapshot.forEach((d) => list.push({ id: d.id, ...d.data() } as PlacementQuestion));
-        return list;
+        return list
+          .filter((question) => !publishedOnly || question.status === "published")
+          .sort((left, right) => left.order - right.order);
       }
     }
   } catch (e) {}
