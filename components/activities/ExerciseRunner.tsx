@@ -219,6 +219,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
   const [flashIndex, setFlashIndex] = useState(0);
   const [flashStage, setFlashStage] = useState<"show" | "choose">("show");
   const [flashCountdown, setFlashCountdown] = useState(0);
+  const memoryPalaceDuration = memoryPalaceRoundConfig[flashIndex]?.duration ?? 15;
   const [wordMemoryInputs, setWordMemoryInputs] = useState<string[]>([]);
   const [correctAnswers, setCorrectAnswers] = useState(0);
   const [summary, setSummary] = useState<ExerciseResult | null>(null);
@@ -591,7 +592,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
 
   useEffect(() => {
     if (phase !== "playing" || kind !== "memory_palace" || flashStage !== "show") return;
-    const duration = (memoryPalaceRoundConfig[flashIndex]?.duration ?? 15) * 1000;
+    const duration = memoryPalaceDuration * 1000;
     const deadline = Date.now() + duration;
     flashDeadlineRef.current = deadline;
     setFlashCountdown(Math.ceil(duration / 1000));
@@ -608,7 +609,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
       window.clearTimeout(finishTimer);
       if (flashDeadlineRef.current === deadline) flashDeadlineRef.current = null;
     };
-  }, [flashIndex, flashStage, kind, memoryPalaceRoundConfig, memoryPalaceRounds, phase]);
+  }, [flashIndex, flashStage, kind, memoryPalaceDuration, memoryPalaceRounds, phase]);
 
   useEffect(() => {
     if (phase !== "playing" || !["flash_words", "word_memory", "chunk_reading", "passage_memory", "digit_memory"].includes(kind) || flashStage !== "show") return;
