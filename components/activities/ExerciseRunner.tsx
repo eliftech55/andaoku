@@ -913,6 +913,13 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     setFlashStage("choose");
   };
 
+  const handleMemoryPalaceContinue = () => {
+    if (phase !== "playing" || kind !== "memory_palace" || flashStage !== "show") return;
+    setFlashCountdown(0);
+    setMemoryPalacePlaced(Array(memoryPalaceRounds[flashIndex]?.words.length ?? 0).fill(null));
+    setFlashStage("choose");
+  };
+
   const handleChunkChoice = (choice: string[]) => {
     if (phase !== "playing" || kind !== "chunk_reading" || flashStage !== "choose") return;
     const round = chunkRounds[flashIndex];
@@ -1449,6 +1456,9 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
                 <span className="inline-block rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-sm font-bold tabular-nums text-amber-900" aria-live="assertive">
                   Kalan süre: {flashCountdown} sn
                 </span>
+                <Button type="button" variant="primary" onClick={handleMemoryPalaceContinue}>
+                  Devam et
+                </Button>
               </>
             ) : (
               <>
