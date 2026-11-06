@@ -199,9 +199,12 @@ service cloud.firestore {
     }
 
     // Başlangıç Sınavı Soruları (placementQuestions)
-    // Soru içeriği okunabilir ancak 'correctOptionId' alanı istemci tarafından doğrudan görülemez
     match /placementQuestions/{questionId} {
-      allow read: if isAuthenticated() && isContentManager();
+      allow read: if isAuthenticated() &&
+        (isContentManager() ||
+         (resource.data.status == 'published' &&
+          exists(/databases/$(database)/documents/placementExams/$(resource.data.examId)) &&
+          get(/databases/$(database)/documents/placementExams/$(resource.data.examId)).data.status == 'published'));
       allow create, update, delete: if isContentManager();
     }
 

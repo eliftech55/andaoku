@@ -190,7 +190,7 @@ export async function getPublishedPlacementPackagesByStage(
     exams.map(async (exam) => {
       const [passage, questions] = await Promise.all([
         getPlacementPassageById(exam.passageId),
-        getQuestionsByExamCode(exam.code),
+        getQuestionsByExamCode(exam.code, true),
       ]);
       return passage ? { exam, passage, questions } : null;
     })
@@ -201,15 +201,29 @@ export async function getPublishedPlacementPackagesByStage(
   );
 }
 
+async function getPublishedPlacementExams(): Promise<PlacementExam[]> {
+  assertFirebaseConfigured();
+  const snapshot = await getDocs(
+    query(collection(db, "placementExams"), where("status", "==", "published"))
+  );
+  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as PlacementExam));
+}
+
 export async function getPublishedPlacementPackages(): Promise<
   { exam: PlacementExam; passage: PlacementPassage; questions: PlacementQuestion[] }[]
 > {
-  const exams = (await getAllPlacementExams()).filter((exam) => exam.status === "published");
+  let exams: PlacementExam[];
+  try {
+    exams = await getPublishedPlacementExams();
+  } catch (error) {
+    console.warn("Yayınlanmış sınavlar Firestore'dan alınamadı, yerel içerik kullanılacak.", error);
+    exams = (await getAllPlacementExams()).filter((exam) => exam.status === "published");
+  }
   const packages = await Promise.all(
     exams.map(async (exam) => {
       const [passage, questions] = await Promise.all([
         getPlacementPassageById(exam.passageId),
-        getQuestionsByExamCode(exam.code),
+        getQuestionsByExamCode(exam.code, true),
       ]);
       if (!passage) return null;
       const difficulty = passage.difficulty || exam.difficulty || difficultyFromLegacyStage(exam.learningStage);
@@ -243,11 +257,21 @@ export async function getStudentPlacementQuestions(
 /**
  * Yönetici veya değerlendirme motoru için tüm soruları (cevap anahtarıyla birlikte) getirir.
  */
-export async function getQuestionsByExamCode(examCode: string): Promise<PlacementQuestion[]> {
+export async function getQuestionsByExamCode(
+  examCode: string,
+  publishedOnly = false
+): Promise<PlacementQuestion[]> {
   try {
     if (process.env.NODE_ENV !== "test" && db) {
       const qRef = collection(db, "placementQuestions");
-      const qQuery = query(qRef, where("examId", "==", examCode), orderBy("order", "asc"));
+      const qQuery = publishedOnly
+        ? query(
+            qRef,
+            where("examId", "==", examCode),
+            where("status", "==", "published"),
+            orderBy("order", "asc")
+          )
+        : query(qRef, where("examId", "==", examCode), orderBy("order", "asc"));
       const snapshot = await getDocs(qQuery);
       if (!snapshot.empty) {
         const list: PlacementQuestion[] = [];
