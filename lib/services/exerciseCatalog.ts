@@ -122,9 +122,33 @@ const EXERCISES: Record<
   },
 };
 
+export const REMOVED_EXERCISE_KINDS: ExerciseKind[] = [
+  "infinity_tracking",
+  "chunk_reading",
+  "pacer_reading",
+  "n_back",
+  "regression_prevention",
+];
+
+export const EXERCISE_KINDS_BY_DIFFICULTY: Record<
+  "beginner" | "intermediate" | "advanced",
+  ExerciseKind[]
+> = {
+  beginner: ["peripheral_vision", "target_scan", "eye_saccade", "flash_words", "point_tracking"],
+  intermediate: ["schulte_table", "digit_memory", "word_memory", "matching_cards", "sequence_memory"],
+  advanced: ["passage_memory", "memory_palace", "visual_change"],
+};
+
+export const AVAILABLE_EXERCISE_KINDS: ExerciseKind[] = [
+  ...EXERCISE_KINDS_BY_DIFFICULTY.beginner,
+  ...EXERCISE_KINDS_BY_DIFFICULTY.intermediate,
+  ...EXERCISE_KINDS_BY_DIFFICULTY.advanced,
+];
+
 export const BUILT_IN_EXERCISE_DEFINITIONS: ExerciseDefinition[] = (
   Object.keys(EXERCISES) as ExerciseKind[]
 ).flatMap((kind) =>
+  REMOVED_EXERCISE_KINDS.includes(kind) ? [] :
   LEVELS.map((level) => {
     const exercise = EXERCISES[kind];
     return {

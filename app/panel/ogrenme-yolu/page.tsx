@@ -28,6 +28,7 @@ import { fetchActivities, fetchAllModules, fetchPassages } from "@/lib/services/
 import { getUserProgressList } from "@/lib/firebase/firestore";
 import { isModuleUnlocked } from "@/lib/services/moduleScoring";
 import type { Activity as LearningActivity, ExerciseKind, LearningModule, ReadingPassage, UserProgress } from "@/lib/types";
+import { AVAILABLE_EXERCISE_KINDS } from "@/lib/services/exerciseCatalog";
 
 const EXERCISE_LABELS: Record<ExerciseKind, string> = {
   peripheral_vision: "Çevresel görüş",
@@ -187,6 +188,7 @@ export default function OgrenmeYoluPage() {
             if (
               activity.moduleId !== mod.id ||
               !activity.level ||
+              !AVAILABLE_EXERCISE_KINDS.includes(activity.type as ExerciseKind) ||
               !mod.exerciseTypes?.includes(activity.type as ExerciseKind)
             ) {
               return false;
@@ -273,9 +275,9 @@ export default function OgrenmeYoluPage() {
                         <Eye className="h-3.5 w-3.5 text-amber-700" />
                         Egzersizler ve seviyeler
                       </p>
-                      {mod.exerciseTypes?.length ? (
+                      {mod.exerciseTypes?.filter((kind) => AVAILABLE_EXERCISE_KINDS.includes(kind)).length ? (
                         <ul className="space-y-1 text-xs text-charcoal-muted">
-                          {mod.exerciseTypes.map((kind) => {
+                          {mod.exerciseTypes.filter((kind) => AVAILABLE_EXERCISE_KINDS.includes(kind)).map((kind) => {
                             const levels = assignedExerciseActivities
                               .filter((activity) => activity.type === kind)
                               .map((activity) => activity.level)
@@ -329,7 +331,7 @@ export default function OgrenmeYoluPage() {
                             </Button>
                           </Link>
                         )}
-                        {mod.exerciseTypes?.length ? (
+                        {mod.exerciseTypes?.filter((kind) => AVAILABLE_EXERCISE_KINDS.includes(kind)).length ? (
                           <Link href={`/panel/egzersizler?moduleId=${encodeURIComponent(mod.id)}`}>
                             <Button size="sm" variant={isCompleted ? "outline" : "amber"} className="font-semibold">
                               <Play className="mr-1.5 h-3.5 w-3.5" />Atanmış egzersizler

@@ -13,6 +13,7 @@ import {
   updateLearningModuleStatus,
 } from "@/lib/firebase/firestore";
 import { fetchPassages } from "@/lib/services/contentService";
+import { AVAILABLE_EXERCISE_KINDS } from "@/lib/services/exerciseCatalog";
 import { DifficultyLevel, EducationLevel, ExerciseKind, LearningModule, ReadingPassage } from "@/lib/types";
 import { CheckCircle2, Eye, Plus, BookOpen, LoaderCircle } from "lucide-react";
 
@@ -413,7 +414,7 @@ export default function ModuleManagementPage() {
                   Okuma metni: {passages.find((passage) => passage.id === module.readingPassageId)?.title || "Henüz atanmamış"}
                 </p>
                 <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-charcoal-muted">
-                  {module.exerciseTypes?.length ? module.exerciseTypes.map((kind) => (
+                  {module.exerciseTypes?.filter((kind) => AVAILABLE_EXERCISE_KINDS.includes(kind)).map((kind) => (
                     <li key={kind}>
                       {EXERCISE_LABELS[kind]}: Seviye {(module.exerciseLevels?.[kind] || []).join(", ") || "atanmamış"}
                     </li>

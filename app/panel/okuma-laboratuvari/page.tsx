@@ -31,6 +31,7 @@ import {
   Question,
   UserProgress,
 } from "@/lib/types";
+import { AVAILABLE_EXERCISE_KINDS } from "@/lib/services/exerciseCatalog";
 
 interface LabHistoryEntry {
   passageId: string;
@@ -121,26 +122,7 @@ function OkumaLaboratuvariContent() {
                 !isVisualAttentionMatrix(item) &&
                 (item.type === "visual_attention" ||
                   item.contentConfig.exerciseKind ||
-                  [
-                    "peripheral_vision",
-                    "target_scan",
-                    "eye_saccade",
-                    "flash_words",
-                    "point_tracking",
-                    "infinity_tracking",
-                    "chunk_reading",
-                    "pacer_reading",
-                    "schulte_table",
-                    "regression_prevention",
-                    "digit_memory",
-                    "word_memory",
-                    "matching_cards",
-                    "sequence_memory",
-                    "passage_memory",
-                    "memory_palace",
-                    "n_back",
-                    "visual_change",
-                  ].includes(item.type as ExerciseKind))
+                  AVAILABLE_EXERCISE_KINDS.includes(item.type as ExerciseKind))
             )
           );
         }

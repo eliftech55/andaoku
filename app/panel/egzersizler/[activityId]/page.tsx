@@ -13,27 +13,9 @@ import { fetchActivities, fetchActivityById, fetchAllModules } from "@/lib/servi
 import { isExerciseLevelUnlocked, isModuleUnlocked } from "@/lib/services/moduleScoring";
 import { Activity, ExerciseAttempt, ExerciseKind, LearningModule } from "@/lib/types";
 import { ArrowLeft, Lock } from "lucide-react";
+import { AVAILABLE_EXERCISE_KINDS } from "@/lib/services/exerciseCatalog";
 
-const EXERCISE_KINDS: ExerciseKind[] = [
-  "peripheral_vision",
-  "target_scan",
-  "eye_saccade",
-  "flash_words",
-  "point_tracking",
-  "infinity_tracking",
-  "chunk_reading",
-  "pacer_reading",
-  "schulte_table",
-  "regression_prevention",
-  "digit_memory",
-  "word_memory",
-  "matching_cards",
-  "sequence_memory",
-  "passage_memory",
-  "memory_palace",
-  "n_back",
-  "visual_change",
-];
+const EXERCISE_KINDS: ExerciseKind[] = AVAILABLE_EXERCISE_KINDS;
 
 export default function RunExercisePage() {
   const params = useParams<{ activityId: string }>();

@@ -12,6 +12,7 @@ import { fetchActivities, fetchAllModules } from "@/lib/services/contentService"
 import { isExerciseLevelUnlocked, isModuleUnlocked } from "@/lib/services/moduleScoring";
 import { ExerciseAttempt, ExerciseKind, Activity, LearningModule, UserProgress } from "@/lib/types";
 import { BookOpen, CheckCircle2, Eye, Lock, Play } from "lucide-react";
+import { AVAILABLE_EXERCISE_KINDS } from "@/lib/services/exerciseCatalog";
 
 const KIND_LABELS: Record<ExerciseKind, string> = {
   peripheral_vision: "Çevresel Görüş",
@@ -113,7 +114,7 @@ export default function StudentExercisesPage() {
       {modules.length === 0 && !error && <Card><CardContent className="p-6 text-sm text-charcoal-muted">Henüz yayımlanmış modül bulunmuyor.</CardContent></Card>}
       {modules.map((module) => {
         const moduleUnlocked = isModuleUnlocked(module, modules, progress);
-        const exerciseKinds = module.exerciseTypes || [];
+        const exerciseKinds = (module.exerciseTypes || []).filter((kind) => AVAILABLE_EXERCISE_KINDS.includes(kind));
         const assignedLevels = module.exerciseLevels || {};
         const moduleActivities = activities
           .filter(

@@ -11,27 +11,12 @@ import { getLearningModules } from "@/lib/firebase/firestore";
 import { fetchPassages } from "@/lib/services/contentService";
 import { ExerciseDefinition, ExerciseKind, LearningModule, ReadingPassage } from "@/lib/types";
 import { CheckCircle2, Eye, BookOpen, LoaderCircle } from "lucide-react";
+import {
+  AVAILABLE_EXERCISE_KINDS,
+  EXERCISE_KINDS_BY_DIFFICULTY,
+} from "@/lib/services/exerciseCatalog";
 
-const KIND_ORDER: ExerciseKind[] = [
-  "peripheral_vision",
-  "target_scan",
-  "eye_saccade",
-  "flash_words",
-  "point_tracking",
-  "infinity_tracking",
-  "chunk_reading",
-  "pacer_reading",
-  "schulte_table",
-  "regression_prevention",
-  "digit_memory",
-  "word_memory",
-  "matching_cards",
-  "sequence_memory",
-  "passage_memory",
-  "memory_palace",
-  "n_back",
-  "visual_change",
-];
+const KIND_ORDER: ExerciseKind[] = AVAILABLE_EXERCISE_KINDS;
 
 const EXERCISE_LEVELS = [1, 2, 3, 4, 5];
 
@@ -89,6 +74,10 @@ function getLevelsForDifficulty(difficulty: LearningModule["difficulty"]): numbe
   return [1, 2];
 }
 
+function getKindsForDifficulty(difficulty: LearningModule["difficulty"]): ExerciseKind[] {
+  return EXERCISE_KINDS_BY_DIFFICULTY[difficulty];
+}
+
 function SelectModuleExercisesContent() {
   const searchParams = useSearchParams();
   const { profile, loading: authLoading } = useAuth();
@@ -139,7 +128,7 @@ function SelectModuleExercisesContent() {
             ? initialModule?.readingPassageId || ""
             : randomItem(matchingPassages)?.id || ""
         );
-        setSelectedKinds(initialModule?.exerciseTypes || []);
+        setSelectedKinds((initialModule?.exerciseTypes || []).filter((kind) => KIND_ORDER.includes(kind)));
         setSelectedLevels(getInitialExerciseLevels(initialModule));
       } catch (loadError) {
         console.error("Modül egzersiz seçimi yüklenemedi:", loadError);
@@ -165,7 +154,7 @@ function SelectModuleExercisesContent() {
         ? module?.readingPassageId || ""
         : randomItem(matchingPassages)?.id || ""
     );
-    setSelectedKinds(module?.exerciseTypes || []);
+    setSelectedKinds((module?.exerciseTypes || []).filter((kind) => KIND_ORDER.includes(kind)));
     setSelectedLevels(getInitialExerciseLevels(module));
     setSuccess(null);
   };
@@ -194,7 +183,8 @@ function SelectModuleExercisesContent() {
       setError("Bu zorluk seviyesi için en az dört egzersiz türünün kataloğa eklenmesi gerekir.");
       return;
     }
-    const selectedRandomKinds = shuffled(availableKinds).slice(0, 4);
+    const selectedRandomKinds = getKindsForDifficulty(selectedModule.difficulty)
+      .filter((kind) => availableKinds.includes(kind));
     const levels = getLevelsForDifficulty(selectedModule.difficulty);
     setSelectedPassageId(randomItem(matchingPassages)?.id || "");
     setSelectedKinds(selectedRandomKinds);
