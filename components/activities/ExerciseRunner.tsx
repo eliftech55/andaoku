@@ -129,7 +129,8 @@ const FLASH_LIKE_KINDS: ExerciseKind[] = [
 const FLASH_WORD_DURATIONS = [6000, 5500, 5000, 4500, 4000];
 const FLASH_WORD_COUNTS = [3, 4, 5, 6, 7];
 const WORD_MEMORY_DURATIONS = [10000, 9000, 8500, 8000, 7500];
-const WORD_MEMORY_COUNTS = [4, 5, 6, 7, 8];
+const WORD_MEMORY_COUNTS = [3, 3, 4, 4, 5];
+const WORD_MEMORY_TIME_LIMITS = [75, 60, 100, 75, 100];
 const EXERCISE_ROUND_COUNT = 5;
 const MEMORY_PALACE_LEVELS = [
   { rows: 2, columns: 2, duration: 15 },
@@ -149,8 +150,11 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     Math.max(3, activity.contentConfig.targetCount || 5)
   );
   const schulteGridSize = Math.min(6, Math.max(3, activity.level || 1) + 2);
+  const levelIndex = Math.min(5, Math.max(1, activity.level || 1)) - 1;
   const durationLimit = kind === "matching_cards"
     ? 75
+    : kind === "word_memory"
+      ? WORD_MEMORY_TIME_LIMITS[levelIndex]
     : Math.min(
       180,
       Math.max(["word_memory", "passage_memory", "memory_palace"].includes(kind) ? 75 : 10, activity.contentConfig.timeLimitSeconds || 60)
@@ -166,7 +170,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     : kind === "passage_memory"
       ? 5000
     : Math.min(3000, Math.max(200, activity.contentConfig.flashDurationMs || 1000));
-  const wordMemoryDuration = WORD_MEMORY_DURATIONS[Math.min(5, Math.max(1, activity.level || 1)) - 1];
+  const wordMemoryDuration = WORD_MEMORY_DURATIONS[levelIndex];
   const memoryPalaceLevel = MEMORY_PALACE_LEVELS[Math.min(5, Math.max(1, activity.level || 1)) - 1];
   const memoryPalaceRoundConfig = Array.from({ length: EXERCISE_ROUND_COUNT }, () => memoryPalaceLevel);
   const words = activity.contentConfig.wordList?.length
@@ -271,6 +275,8 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     totalRef.current =
       kind === "eye_saccade"
         ? sequenceLength
+        : kind === "word_memory"
+          ? WORD_MEMORY_COUNTS[levelIndex] * EXERCISE_ROUND_COUNT
         : ["matching_cards", "point_tracking"].includes(kind)
           ? EXERCISE_ROUND_COUNT
           : ["pacer_reading", "regression_prevention", "digit_memory", "n_back", "visual_change", "infinity_tracking"].includes(kind)
@@ -1096,25 +1102,25 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     if (phase !== "playing" || kind !== "word_memory" || flashStage !== "choose") return;
 
     const expected = wordMemoryRounds[flashIndex]?.words ?? [];
-    const answer = wordMemoryInputs.map((word) => word.trim().toLocaleLowerCase("tr-TR"));
+    const answer = wordMemoryInputs
+      .map((word) => word.trim().toLocaleLowerCase("tr-TR"))
+      .filter(Boolean);
     const expectedCounts = new Map<string, number>();
     expected.forEach((word) => {
       const normalizedWord = word.toLocaleLowerCase("tr-TR");
       expectedCounts.set(normalizedWord, (expectedCounts.get(normalizedWord) || 0) + 1);
     });
-    const isCorrect = answer.length === expected.length && answer.every((word) => {
+    let rememberedCount = 0;
+    answer.forEach((word) => {
       const remaining = expectedCounts.get(word) || 0;
-      if (remaining === 0) return false;
+      if (remaining === 0) return;
       expectedCounts.set(word, remaining - 1);
-      return true;
+      rememberedCount += 1;
     });
 
-    if (isCorrect) {
-      correctRef.current += 1;
-      setCorrectAnswers(correctRef.current);
-    } else {
-      wrongRef.current += 1;
-    }
+    correctRef.current += rememberedCount;
+    wrongRef.current += answer.length - rememberedCount;
+    setCorrectAnswers(correctRef.current);
 
     const next = flashIndex + 1;
     if (next >= wordMemoryRounds.length) {
@@ -1124,7 +1130,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
     setFlashIndex(next);
     setFlashStage("show");
     setFlashCountdown(Math.ceil(wordMemoryDuration / 1000));
-    setWordMemoryInputs(Array(expected.length).fill(""));
+    setWordMemoryInputs(Array(wordMemoryRounds[next]?.words.length ?? expected.length).fill(""));
   };
 
   const title = activity.title;
@@ -1478,11 +1484,13 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
 
         {phase === "playing" && kind === "word_memory" && wordMemoryRounds[flashIndex] && (
           <div className="space-y-4 rounded-xl bg-ivory-warm p-6 text-center">
-            <p className="text-xs text-charcoal-muted">{wordMemoryRounds[flashIndex].words.length} kelime</p>
+            <p className="text-xs text-charcoal-muted">
+              {wordMemoryRounds[flashIndex].words.length} kelime · Hatırladığınız kelimeleri yazın; bilmediklerinizi boş bırakabilirsiniz.
+            </p>
             {flashStage === "show" ? (
               <>
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-charcoal">Kelimeleri sırayla aklınızda tutun:</p>
+                  <p className="text-sm font-semibold text-charcoal">Kelimeleri aklınızda tutun:</p>
                   <span className="rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-sm font-bold tabular-nums text-amber-900" aria-live="polite">
                     {flashCountdown} sn
                   </span>
@@ -1499,7 +1507,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
             ) : (
               <form className="space-y-3 text-left" onSubmit={handleWordMemorySubmit}>
                 <p className="text-sm font-semibold text-charcoal">
-                  Hatırladığınız kelimeleri gösterilen sırayla yazın:
+                  Hatırladığınız kelimeleri yazın. Sıra önemli değildir; bilmediklerinizi boş bırakabilirsiniz:
                 </p>
                 <div className="space-y-2">
                   {wordMemoryRounds[flashIndex].words.map((_, index) => (
@@ -1521,7 +1529,7 @@ export function ExerciseRunner({ activity, onComplete, nextActivityHref }: Exerc
                     />
                   ))}
                 </div>
-                <Button type="submit" variant="primary" disabled={wordMemoryInputs.some((word) => !word.trim())}>
+                <Button type="submit" variant="primary">
                   Cevabı gönder
                 </Button>
               </form>
