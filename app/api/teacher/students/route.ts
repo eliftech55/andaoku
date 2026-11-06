@@ -32,7 +32,10 @@ export async function GET(request: NextRequest) {
 
 async function teacherId(request: NextRequest) {
   const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  if (!token || !adminAuth || !adminDb) return null;
+  if (!adminAuth || !adminDb) {
+    throw new Error("Firebase Admin SDK yapılandırılmamış. FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL ve FIREBASE_PRIVATE_KEY değişkenlerini tanımlayın.");
+  }
+  if (!token) return null;
   try {
     const decoded = await adminAuth.verifyIdToken(token);
     return decoded.uid;
@@ -115,6 +118,10 @@ export async function POST(request: NextRequest) {
     }
     return NextResponse.json({ error: "Geçersiz işlem." }, { status: 400 });
   } catch (error: unknown) {
+    if (error instanceof Error && error.message.startsWith("Firebase Admin SDK yapılandırılmamış")) {
+      console.error(error.message);
+      return NextResponse.json({ error: error.message }, { status: 503 });
+    }
     const code = typeof error === "object" && error && "code" in error ? String(error.code) : "";
     const errorMessage = code === "auth/email-already-exists" ? "Bu e-posta adresi zaten kullanılıyor." : "Öğrenci işlemi tamamlanamadı.";
     console.error("Teacher student API:", error);
