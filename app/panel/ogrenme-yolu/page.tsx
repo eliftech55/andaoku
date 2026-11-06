@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,12 +51,27 @@ const EXERCISE_LABELS: Record<ExerciseKind, string> = {
 };
 
 export default function OgrenmeYoluPage() {
+  const searchParams = useSearchParams();
   const { user, profile } = useAuth();
   const [modules, setModules] = useState<LearningModule[]>([]);
   const [activities, setActivities] = useState<LearningActivity[]>([]);
   const [passages, setPassages] = useState<ReadingPassage[]>([]);
   const [progressList, setProgressList] = useState<UserProgress[]>([]);
   const [loading, setLoading] = useState(true);
+  const requestedModuleId = searchParams.get("moduleId");
+
+  useEffect(() => {
+    const hashModuleId = typeof window !== "undefined" && window.location.hash.startsWith("#module-")
+      ? window.location.hash.slice("#module-".length)
+      : null;
+    const targetModuleId = requestedModuleId || hashModuleId;
+    if (!targetModuleId || loading || modules.length === 0) return;
+    const moduleElement = document.getElementById(`module-${targetModuleId}`);
+    if (!moduleElement) return;
+    requestAnimationFrame(() => {
+      moduleElement.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [requestedModuleId, loading, modules]);
 
   useEffect(() => {
     async function loadData() {
