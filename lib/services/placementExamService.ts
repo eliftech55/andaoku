@@ -246,7 +246,7 @@ export async function getPublishedPlacementPackages(): Promise<
 export async function getStudentPlacementQuestions(
   examCode: string
 ): Promise<Omit<PlacementQuestion, "correctOptionId">[]> {
-  const allQuestions = await getQuestionsByExamCode(examCode);
+  const allQuestions = await getQuestionsByExamCode(examCode, true);
   // Doğru cevap anahtarını öğrenciye giden veriden temizle
   return allQuestions.map((q) => {
     const { correctOptionId, ...sanitized } = q;
@@ -267,7 +267,8 @@ export async function getQuestionsByExamCode(
       const qQuery = publishedOnly
         ? query(
             qRef,
-            where("examId", "==", examCode)
+            where("examId", "==", examCode),
+            where("status", "==", "published")
           )
         : query(qRef, where("examId", "==", examCode), orderBy("order", "asc"));
       const snapshot = await getDocs(qQuery);
