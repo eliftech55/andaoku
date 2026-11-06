@@ -48,6 +48,10 @@ function moduleDifficulty(module: LearningModule | null, moduleId: string | null
   return null;
 }
 
+function isVisualAttentionMatrix(activity: Activity): boolean {
+  return activity.title.toLocaleLowerCase("tr-TR").includes("görsel dikkat matrisi");
+}
+
 const LAB_HISTORY_PREFIX = "andaoku_lab_history";
 
 export default function OkumaLaboratuvariPage() {
@@ -114,6 +118,7 @@ function OkumaLaboratuvariContent() {
             activityList.filter(
               (item) =>
                 item.status === "published" &&
+                !isVisualAttentionMatrix(item) &&
                 (item.type === "visual_attention" ||
                   item.contentConfig.exerciseKind ||
                   [
@@ -437,7 +442,7 @@ function OkumaLaboratuvariContent() {
       ) : (
         <div className="space-y-6">
           <div className="grid gap-3 sm:grid-cols-3" aria-label="Göz egzersizi seçin">
-            {requestedModuleId && moduleActivities.length > 0
+            {requestedModuleId
               ? moduleActivities.map((exercise) =>
                 exercise.type === "visual_attention" ? (
                   <button
@@ -507,18 +512,19 @@ function OkumaLaboratuvariContent() {
               </button>
             ))}
           </div>
-          {selectedEyeExercise === "matrix" ? (
-            <VisualAttentionGame
-              key={`${selectedActivity?.id || "default"}-matrix`}
-              targetSymbol={selectedActivity?.contentConfig.targetSymbol}
-              instructions={selectedActivity?.instructions}
-            />
-          ) : (
-            <EyeMovementExercise
-              key={selectedEyeExercise}
-              type={selectedEyeExercise}
-            />
-          )}
+          {(!requestedModuleId || selectedActivity?.type === "visual_attention") &&
+            (selectedEyeExercise === "matrix" ? (
+              <VisualAttentionGame
+                key={`${selectedActivity?.id || "default"}-matrix`}
+                targetSymbol={selectedActivity?.contentConfig.targetSymbol}
+                instructions={selectedActivity?.instructions}
+              />
+            ) : (
+              <EyeMovementExercise
+                key={selectedEyeExercise}
+                type={selectedEyeExercise}
+              />
+            ))}
         </div>
       )}
     </div>
