@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { BookOpen, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,10 +22,12 @@ export default function StudentLoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const loadStudents = async () => {
+  const loadStudents = async (requestedCode = classCode) => {
     setError(""); setLoading(true);
     try {
-      const response = await fetch(`/api/teacher/students?classCode=${encodeURIComponent(classCode)}`);
+      const normalizedCode = requestedCode.trim().toUpperCase();
+      setClassCode(normalizedCode);
+      const response = await fetch(`/api/teacher/students?classCode=${encodeURIComponent(normalizedCode)}`);
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Sınıf bulunamadı.");
       setClassId(result.classId); setStudents(result.students || []); setUsername("");
@@ -33,6 +35,10 @@ export default function StudentLoginPage() {
     } catch (e) { setError(e instanceof Error ? e.message : "Sınıf öğrencileri alınamadı."); }
     finally { setLoading(false); }
   };
+  useEffect(() => {
+    const sharedClassCode = new URLSearchParams(window.location.search).get("classCode")?.trim().toUpperCase();
+    if (sharedClassCode) void loadStudents(sharedClassCode);
+  }, []);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault(); setError(""); setLoading(true);
