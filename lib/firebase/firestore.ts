@@ -353,7 +353,9 @@ export async function assignExercisesToModule(
   nextActivities.forEach(({ id, ...activity }) => {
     batch.set(doc(db, "activities", id), activity);
   });
+  const { id: _moduleId, ...moduleData } = module;
   batch.set(moduleRef, {
+    ...moduleData,
     readingPassageId,
     exerciseTypes,
     exerciseLevels: normalizedLevels,
