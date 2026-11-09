@@ -54,7 +54,7 @@ function shuffled<T>(items: T[]): T[] {
 function getInitialExerciseLevels(
   module: LearningModule | undefined
 ): Partial<Record<ExerciseKind, number[]>> {
-  const defaults = module?.order === 1 ? [1, 2, 3] : EXERCISE_LEVELS;
+  const defaults = EXERCISE_LEVELS;
   return (module?.exerciseTypes || []).reduce<Partial<Record<ExerciseKind, number[]>>>(
     (levels, kind) => {
       levels[kind] = module?.exerciseLevels?.[kind] || defaults;
@@ -69,9 +69,7 @@ function randomItem<T>(items: T[]): T | undefined {
 }
 
 function getLevelsForDifficulty(difficulty: LearningModule["difficulty"]): number[] {
-  if (difficulty === "advanced") return [1, 2, 3, 4, 5];
-  if (difficulty === "intermediate") return [1, 2, 3];
-  return [1, 2];
+  return EXERCISE_LEVELS;
 }
 
 function getKindsForDifficulty(difficulty: LearningModule["difficulty"]): ExerciseKind[] {
@@ -209,7 +207,7 @@ function SelectModuleExercisesContent() {
     setSelectedLevels((current) => ({
       ...current,
       [kind]: selectedModule?.exerciseLevels?.[kind] ||
-        (selectedModule?.order === 1 ? [1, 2, 3] : EXERCISE_LEVELS),
+        EXERCISE_LEVELS,
     }));
   };
 

@@ -10,6 +10,7 @@ import {
   getExerciseDefinitions,
   initializeExerciseCatalog,
   saveExerciseDefinition,
+  synchronizeExerciseCatalogAndModules,
 } from "@/lib/firebase/firestore";
 import { ExerciseDefinition, ExerciseKind } from "@/lib/types";
 import {
@@ -57,6 +58,7 @@ export default function ExerciseManagementPage() {
   const [definitions, setDefinitions] = useState<ExerciseDefinition[]>([]);
   const [loading, setLoading] = useState(true);
   const [initializing, setInitializing] = useState(false);
+  const [synchronizing, setSynchronizing] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -94,6 +96,25 @@ export default function ExerciseManagementPage() {
       setError("Egzersiz kataloğu oluşturulamadı. Firestore yazma erişimini kontrol edin.");
     } finally {
       setInitializing(false);
+    }
+  };
+
+  const handleSynchronize = async () => {
+    setSynchronizing(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await synchronizeExerciseCatalogAndModules();
+      await loadDefinitions();
+      setNotice(
+        `${result.definitionCount} egzersiz seviyesi güncellendi. ${result.moduleCount} modül kolaydan zora 1–5 seviyeleriyle eşleştirildi.` +
+          (result.skippedModuleCount ? ` ${result.skippedModuleCount} modül okuma metni veya zorluk bilgisi eksik olduğu için atlandı.` : "")
+      );
+    } catch (synchronizeError) {
+      console.error("Egzersiz kataloğu ve modüller eşleştirilemedi:", synchronizeError);
+      setError("Egzersiz kataloğu ve modül eşleştirmeleri güncellenemedi. Firestore yazma erişimini kontrol edin.");
+    } finally {
+      setSynchronizing(false);
     }
   };
 
@@ -142,8 +163,12 @@ export default function ExerciseManagementPage() {
           <Link href="/yonetim">
             <Button size="sm" variant="outline">Yönetim Paneline Dön</Button>
           </Link>
-          <Button size="sm" variant="amber" onClick={handleInitialize} disabled={initializing}>
+          <Button size="sm" variant="amber" onClick={handleInitialize} disabled={initializing || synchronizing}>
             {initializing ? <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" />Hazırlanıyor</> : <><Eye className="mr-2 h-4 w-4" />{definitions.length ? "Eksik seviyeleri ekle" : "Egzersiz kataloğunu oluştur"}</>}
+          </Button>
+          <Button size="sm" onClick={handleSynchronize} disabled={initializing || synchronizing}>
+            {synchronizing ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+            Katalog ve modülleri eşleştir
           </Button>
         </div>
       </header>

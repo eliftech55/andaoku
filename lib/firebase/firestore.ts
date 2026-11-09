@@ -38,7 +38,12 @@ import {
   UserRole,
   UserActivitySummary,
 } from "../types";
-import { AVAILABLE_EXERCISE_KINDS, BUILT_IN_EXERCISE_DEFINITIONS } from "../services/exerciseCatalog";
+import {
+  AVAILABLE_EXERCISE_KINDS,
+  BUILT_IN_EXERCISE_DEFINITIONS,
+  EXERCISE_KINDS_BY_DIFFICULTY,
+  EXERCISE_LEVELS,
+} from "../services/exerciseCatalog";
 import { calculateModuleScore } from "../services/moduleScoring";
 
 // ==========================================
@@ -175,6 +180,60 @@ export async function initializeExerciseCatalog(): Promise<void> {
     batch.set(doc(db, "exerciseDefinitions", id), definition);
   });
   await batch.commit();
+}
+
+export async function synchronizeExerciseCatalogAndModules(): Promise<{
+  definitionCount: number;
+  moduleCount: number;
+  skippedModuleCount: number;
+}> {
+  const now = new Date().toISOString();
+  const definitionsBatch = writeBatch(db);
+  BUILT_IN_EXERCISE_DEFINITIONS.forEach(({ id, ...definition }) => {
+    definitionsBatch.set(doc(db, "exerciseDefinitions", id), {
+      ...definition,
+      updatedAt: now,
+    }, { merge: true });
+  });
+  await definitionsBatch.commit();
+
+  const modulesSnapshot = await getDocs(collection(db, "learningModules"));
+  const modules = modulesSnapshot.docs.map(
+    (item) => ({ id: item.id, ...item.data() }) as LearningModule
+  );
+  const definitions = BUILT_IN_EXERCISE_DEFINITIONS;
+  let moduleCount = 0;
+  let skippedModuleCount = 0;
+
+  for (const module of modules) {
+    const exerciseTypes = EXERCISE_KINDS_BY_DIFFICULTY[module.difficulty];
+    if (!module.readingPassageId || !exerciseTypes?.length) {
+      skippedModuleCount += 1;
+      continue;
+    }
+
+    try {
+      await assignExercisesToModule(
+        module.id,
+        module.readingPassageId,
+        exerciseTypes,
+        Object.fromEntries(
+          exerciseTypes.map((kind) => [kind, [...EXERCISE_LEVELS]])
+        ) as Partial<Record<ExerciseKind, number[]>>,
+        definitions
+      );
+      moduleCount += 1;
+    } catch (error) {
+      console.warn(`Modül egzersizleri eşleştirilemedi (${module.id}):`, error);
+      skippedModuleCount += 1;
+    }
+  }
+
+  return {
+    definitionCount: BUILT_IN_EXERCISE_DEFINITIONS.length,
+    moduleCount,
+    skippedModuleCount,
+  };
 }
 
 export async function saveExerciseDefinition(definition: ExerciseDefinition): Promise<void> {

@@ -1,6 +1,8 @@
 import { ExerciseDefinition, ExerciseKind } from "@/lib/types";
 
-const LEVELS = [
+export const EXERCISE_LEVELS = [1, 2, 3, 4, 5] as const;
+
+const LEVEL_CONFIGS = [
   { level: 1, label: "Başlangıç", gridSize: 4, seconds: 50, targetCount: 5, sequenceLength: 4, flashDurationMs: 6000 },
   { level: 2, label: "Kolay", gridSize: 5, seconds: 45, targetCount: 7, sequenceLength: 6, flashDurationMs: 5500 },
   { level: 3, label: "Orta", gridSize: 6, seconds: 40, targetCount: 10, sequenceLength: 8, flashDurationMs: 5000 },
@@ -149,7 +151,7 @@ export const BUILT_IN_EXERCISE_DEFINITIONS: ExerciseDefinition[] = (
   Object.keys(EXERCISES) as ExerciseKind[]
 ).flatMap((kind) =>
   REMOVED_EXERCISE_KINDS.includes(kind) ? [] :
-  LEVELS.map((level) => {
+  LEVEL_CONFIGS.map((level) => {
     const exercise = EXERCISES[kind];
     return {
       id: `${kind}-level-${level.level}`,
