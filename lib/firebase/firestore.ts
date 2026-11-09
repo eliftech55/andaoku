@@ -38,7 +38,7 @@ import {
   UserRole,
   UserActivitySummary,
 } from "../types";
-import { BUILT_IN_EXERCISE_DEFINITIONS } from "../services/exerciseCatalog";
+import { AVAILABLE_EXERCISE_KINDS, BUILT_IN_EXERCISE_DEFINITIONS } from "../services/exerciseCatalog";
 import { calculateModuleScore } from "../services/moduleScoring";
 
 // ==========================================
@@ -156,7 +156,9 @@ export async function updateLearningModuleStatus(
 
 export async function getExerciseDefinitions(): Promise<ExerciseDefinition[]> {
   const snapshot = await getDocs(collection(db, "exerciseDefinitions"));
-  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as ExerciseDefinition);
+  return snapshot.docs
+    .map((item) => ({ id: item.id, ...item.data() }) as ExerciseDefinition)
+    .filter((definition) => AVAILABLE_EXERCISE_KINDS.includes(definition.kind));
 }
 
 export async function initializeExerciseCatalog(): Promise<void> {
@@ -222,6 +224,7 @@ export async function assignExercisesToModule(
   }
   const assignedDefinitions = definitions.filter(
     (definition) =>
+      AVAILABLE_EXERCISE_KINDS.includes(definition.kind) &&
       exerciseTypes.includes(definition.kind) &&
       normalizedLevels[definition.kind]?.includes(definition.level) &&
       definition.status === "published"
@@ -303,7 +306,7 @@ export async function getActivities(moduleId?: string): Promise<Activity[]> {
     snapshot.forEach((d) => {
       list.push({ id: d.id, ...d.data() } as Activity);
     });
-    return list;
+    return list.filter((activity) => AVAILABLE_EXERCISE_KINDS.includes(activity.type as ExerciseKind));
   } catch (error) {
     console.error("Etkinlikleri getirme hatası:", error);
     return [];
@@ -315,7 +318,8 @@ export async function getActivityById(id: string): Promise<Activity | null> {
     const docRef = doc(db, "activities", id);
     const snapshot = await getDoc(docRef);
     if (snapshot.exists()) {
-      return { id: snapshot.id, ...snapshot.data() } as Activity;
+      const activity = { id: snapshot.id, ...snapshot.data() } as Activity;
+      return AVAILABLE_EXERCISE_KINDS.includes(activity.type as ExerciseKind) ? activity : null;
     }
     return null;
   } catch (error) {
