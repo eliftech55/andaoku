@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -71,6 +71,10 @@ export default function BaslangicSinavlariYonetimPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [hasGeneratedContent, setHasGeneratedContent] = useState(false);
+  const [contentSearch, setContentSearch] = useState("");
+  const [contentDifficultyFilter, setContentDifficultyFilter] = useState<"all" | DifficultyLevel>("all");
+  const [contentStatusFilter, setContentStatusFilter] = useState<"all" | ContentStatus>("all");
+  const [contentSort, setContentSort] = useState<"newest" | "oldest" | "title-asc" | "title-desc">("newest");
 
   // Düzenleme / Oluşturma Modalı
   const [editorModalOpen, setEditorModalOpen] = useState(false);
@@ -103,6 +107,28 @@ export default function BaslangicSinavlariYonetimPage() {
   const [previewExam, setPreviewExam] = useState<PlacementExam | null>(null);
   const [previewPassage, setPreviewPassage] = useState<PlacementPassage | null>(null);
   const [previewQuestions, setPreviewQuestions] = useState<PlacementQuestion[]>([]);
+
+  const visibleExams = useMemo(() => {
+    const search = contentSearch.trim().toLocaleLowerCase("tr-TR");
+    const filtered = exams.filter((exam) => {
+      const matchesSearch = !search ||
+        `${exam.title} ${exam.code}`.toLocaleLowerCase("tr-TR").includes(search);
+      const matchesDifficulty = contentDifficultyFilter === "all" ||
+        (exam.difficulty || "beginner") === contentDifficultyFilter;
+      const matchesStatus = contentStatusFilter === "all" || exam.status === contentStatusFilter;
+      return matchesSearch && matchesDifficulty && matchesStatus;
+    });
+
+    return [...filtered].sort((a, b) => {
+      if (contentSort === "title-asc" || contentSort === "title-desc") {
+        const comparison = a.title.localeCompare(b.title, "tr");
+        return contentSort === "title-asc" ? comparison : -comparison;
+      }
+      const aDate = Date.parse(a.updatedAt || a.createdAt || "");
+      const bDate = Date.parse(b.updatedAt || b.createdAt || "");
+      return contentSort === "newest" ? bDate - aDate : aDate - bDate;
+    });
+  }, [contentDifficultyFilter, contentSearch, contentSort, contentStatusFilter, exams]);
 
   const createEmptyQuestion = (examCode: string, order: number): PlacementQuestion => ({
     id: `q-${examCode}-${Date.now()}-${order}`,
@@ -565,6 +591,48 @@ export default function BaslangicSinavlariYonetimPage() {
         </div>
       )}
 
+      <div className="rounded-2xl border border-sage-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+          <label className="flex-1 text-xs font-semibold text-charcoal">
+            İçeriklerde ara
+            <input
+              className="mt-1 w-full rounded-xl border border-sage-200 p-2.5 font-normal outline-none focus:border-brand-500"
+              value={contentSearch}
+              onChange={(event) => setContentSearch(event.target.value)}
+              placeholder="İçerik adı veya kodu"
+            />
+          </label>
+          <label className="text-xs font-semibold text-charcoal">
+            Zorluk
+            <select className="mt-1 block rounded-xl border border-sage-200 p-2.5 font-normal" value={contentDifficultyFilter} onChange={(event) => setContentDifficultyFilter(event.target.value as typeof contentDifficultyFilter)}>
+              <option value="all">Tüm seviyeler</option>
+              {difficultyLevels.map((level) => <option key={level.value} value={level.value}>{level.label}</option>)}
+            </select>
+          </label>
+          <label className="text-xs font-semibold text-charcoal">
+            Durum
+            <select className="mt-1 block rounded-xl border border-sage-200 p-2.5 font-normal" value={contentStatusFilter} onChange={(event) => setContentStatusFilter(event.target.value as typeof contentStatusFilter)}>
+              <option value="all">Tüm durumlar</option>
+              <option value="published">Yayında</option>
+              <option value="draft">Taslak</option>
+              <option value="archived">Arşivlendi</option>
+            </select>
+          </label>
+          <label className="text-xs font-semibold text-charcoal">
+            Sırala
+            <select className="mt-1 block rounded-xl border border-sage-200 p-2.5 font-normal" value={contentSort} onChange={(event) => setContentSort(event.target.value as typeof contentSort)}>
+              <option value="newest">En yeni</option>
+              <option value="oldest">En eski</option>
+              <option value="title-asc">Adı (A-Z)</option>
+              <option value="title-desc">Adı (Z-A)</option>
+            </select>
+          </label>
+        </div>
+        <p className="mt-3 text-xs text-charcoal-muted">
+          {visibleExams.length} içerik gösteriliyor · Toplam {exams.length} içerik
+        </p>
+      </div>
+
       {/* Sınav Listesi Tablosu */}
       <div className="rounded-2xl border border-sage-200 bg-white overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
@@ -587,13 +655,13 @@ export default function BaslangicSinavlariYonetimPage() {
                     İçerikler veritabanından yükleniyor...
                   </td>
                 </tr>
-              ) : exams.length === 0 && !loadError ? (
+              ) : visibleExams.length === 0 && !loadError ? (
                 <tr>
                   <td colSpan={7} className="p-8 text-center text-charcoal-muted">
-                    Henüz içerik paketi bulunmuyor. Yeni içerik ekleyerek başlayın.
+                    {exams.length === 0 ? "Henüz içerik paketi bulunmuyor. Yeni içerik ekleyerek başlayın." : "Filtrelere uyan içerik bulunamadı."}
                   </td>
                 </tr>
-              ) : exams.map((ex) => (
+              ) : visibleExams.map((ex) => (
                 <tr key={ex.code} className="hover:bg-ivory-warm/50 transition-colors">
                   <td className="p-3.5 font-bold text-charcoal">{ex.title}</td>
                   <td className="p-3.5 font-mono text-[11px] text-charcoal-muted">{ex.code}</td>
