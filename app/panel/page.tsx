@@ -120,6 +120,7 @@ export default function UserDashboardPage() {
     user?.email?.split("@")[0] ||
     "Okur";
   const firstName = displayName.split(/\s+/)[0];
+  const assignedModuleIds = new Set(assignments.filter((assignment) => assignment.assignmentType === "module").map((assignment) => assignment.targetId));
 
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8 max-w-7xl">
@@ -231,7 +232,7 @@ export default function UserDashboardPage() {
               <Card key={assignment.id} className="border-amber-200 bg-amber-50/40">
                 <CardContent className="flex items-center justify-between gap-3 p-5">
                   <div><p className="font-bold text-charcoal">{assignment.title}</p><p className="mt-1 text-xs text-charcoal-muted">{assignment.dueAt ? `Son tarih: ${new Date(assignment.dueAt).toLocaleDateString("tr-TR")}` : "Son tarih yok"}</p></div>
-                  <Link href={assignment.assignmentType === "passage" ? `/panel/okuma-laboratuvari?passageId=${encodeURIComponent(assignment.targetId)}` : `/panel/egzersizler/${encodeURIComponent(assignment.targetId)}`}><Button size="sm" variant="amber">Başla</Button></Link>
+                  <Link href={assignment.assignmentType === "passage" ? `/panel/okuma-laboratuvari?passageId=${encodeURIComponent(assignment.targetId)}` : assignment.assignmentType === "module" ? `/panel/ogrenme-yolu?moduleId=${encodeURIComponent(assignment.targetId)}#module-${encodeURIComponent(assignment.targetId)}` : `/panel/egzersizler/${encodeURIComponent(assignment.targetId)}`}><Button size="sm" variant="amber">Başla</Button></Link>
                 </CardContent>
               </Card>
             ))}
@@ -263,7 +264,7 @@ export default function UserDashboardPage() {
               const progress = progressList.find((item) => item.moduleId === module.id);
               const requiredScore = module.requiredCompletionScore ?? 70;
               const isCompleted = (progress?.overallScore ?? 0) >= requiredScore;
-              const isUnlocked = isModuleUnlocked(module, modules, progressList);
+              const isUnlocked = assignedModuleIds.has(module.id) || isModuleUnlocked(module, modules, progressList);
               const content = (
                 <span className="flex h-full flex-col justify-between gap-3">
                   <span className="flex items-start justify-between gap-2">

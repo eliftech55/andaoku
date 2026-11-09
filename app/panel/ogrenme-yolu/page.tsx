@@ -25,7 +25,7 @@ import {
   Eye,
 } from "lucide-react";
 import { fetchActivities, fetchAllModules, fetchPassages } from "@/lib/services/contentService";
-import { getUserProgressList } from "@/lib/firebase/firestore";
+import { getAssignmentsForStudent, getUserProgressList } from "@/lib/firebase/firestore";
 import { isModuleUnlocked } from "@/lib/services/moduleScoring";
 import type { Activity as LearningActivity, ExerciseKind, LearningModule, ReadingPassage, UserProgress } from "@/lib/types";
 import { AVAILABLE_EXERCISE_KINDS } from "@/lib/services/exerciseCatalog";
@@ -58,6 +58,7 @@ export default function OgrenmeYoluPage() {
   const [activities, setActivities] = useState<LearningActivity[]>([]);
   const [passages, setPassages] = useState<ReadingPassage[]>([]);
   const [progressList, setProgressList] = useState<UserProgress[]>([]);
+  const [assignedModuleIds, setAssignedModuleIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const requestedModuleId = searchParams.get("moduleId");
 
@@ -78,16 +79,18 @@ export default function OgrenmeYoluPage() {
     async function loadData() {
       const uid = user?.uid || profile?.uid || "demo-learner-123";
       try {
-        const [mods, progs, activityList, passageList] = await Promise.all([
+        const [mods, progs, activityList, passageList, assignments] = await Promise.all([
           fetchAllModules(),
           getUserProgressList(uid),
           fetchActivities(),
           fetchPassages(),
+          getAssignmentsForStudent(uid),
         ]);
         setModules(mods);
         setProgressList(progs);
         setActivities(activityList);
         setPassages(passageList);
+        setAssignedModuleIds(new Set(assignments.filter((assignment) => assignment.assignmentType === "module").map((assignment) => assignment.targetId)));
       } catch (e) {
         console.error(e);
       } finally {
@@ -175,7 +178,7 @@ export default function OgrenmeYoluPage() {
       <div className="space-y-6 relative before:absolute before:inset-0 before:left-7 before:w-1 before:bg-sage-200 before:hidden sm:before:block">
         {modules.map((mod) => {
           const isCompleted = completedModuleIds.has(mod.id);
-          const isUnlocked = isModuleUnlocked(mod, modules, progressList);
+          const isUnlocked = assignedModuleIds.has(mod.id) || isModuleUnlocked(mod, modules, progressList);
 
           const Icon = getModuleIcon(mod.order);
           const moduleActivities = activities.filter(

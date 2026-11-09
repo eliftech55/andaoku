@@ -322,7 +322,7 @@ export interface TeacherAssignment {
   id: string;
   teacherId: string;
   classId: string;
-  assignmentType: "passage" | "exercise";
+  assignmentType: "passage" | "exercise" | "module";
   targetId: string;
   title: string;
   activityId?: string;
