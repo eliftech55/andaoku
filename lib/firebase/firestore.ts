@@ -42,7 +42,6 @@ import {
   AVAILABLE_EXERCISE_KINDS,
   BUILT_IN_EXERCISE_DEFINITIONS,
   EXERCISE_KINDS_BY_DIFFICULTY,
-  EXERCISE_LEVELS,
 } from "../services/exerciseCatalog";
 import { calculateModuleScore } from "../services/moduleScoring";
 
@@ -205,6 +204,15 @@ export async function synchronizeExerciseCatalogAndModules(): Promise<{
   let moduleCount = 0;
   let skippedModuleCount = 0;
 
+  const modulesByDifficulty = new Map<DifficultyLevel, LearningModule[]>();
+  modules
+    .sort((left, right) => left.order - right.order)
+    .forEach((module) => {
+      const current = modulesByDifficulty.get(module.difficulty) || [];
+      current.push(module);
+      modulesByDifficulty.set(module.difficulty, current);
+    });
+
   for (const module of modules) {
     const exerciseTypes = EXERCISE_KINDS_BY_DIFFICULTY[module.difficulty];
     if (!module.readingPassageId || !exerciseTypes?.length) {
@@ -213,12 +221,16 @@ export async function synchronizeExerciseCatalogAndModules(): Promise<{
     }
 
     try {
+      const difficultyModules = modulesByDifficulty.get(module.difficulty) || [];
+      const moduleIndex = difficultyModules.findIndex((item) => item.id === module.id);
+      const levelStart = moduleIndex === 0 ? 1 : 3;
+      const assignedLevels = [levelStart, levelStart + 1, levelStart + 2];
       await assignExercisesToModule(
         module.id,
         module.readingPassageId,
         exerciseTypes,
         Object.fromEntries(
-          exerciseTypes.map((kind) => [kind, [...EXERCISE_LEVELS]])
+          exerciseTypes.map((kind) => [kind, assignedLevels])
         ) as Partial<Record<ExerciseKind, number[]>>,
         definitions
       );
@@ -276,8 +288,11 @@ export async function assignExercisesToModule(
     const levels = Array.from(new Set(exerciseLevels[kind] || [])).sort(
       (left, right) => left - right
     );
-    if (!levels.length || levels.some((level, index) => level !== index + 1)) {
-      throw new Error("Egzersiz seviyeleri 1’den başlayarak kesintisiz seçilmelidir.");
+    if (
+      !levels.length ||
+      levels.some((level, index) => level !== levels[0] + index)
+    ) {
+      throw new Error("Egzersiz seviyeleri kesintisiz seçilmelidir.");
     }
     normalizedLevels[kind] = levels;
   }

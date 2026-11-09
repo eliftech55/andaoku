@@ -107,7 +107,7 @@ export default function ExerciseManagementPage() {
       const result = await synchronizeExerciseCatalogAndModules();
       await loadDefinitions();
       setNotice(
-        `${result.definitionCount} egzersiz seviyesi güncellendi. ${result.moduleCount} modül kolaydan zora 1–5 seviyeleriyle eşleştirildi.` +
+        `${result.definitionCount} egzersiz seviyesi güncellendi. ${result.moduleCount} modüle eşit sayıda egzersiz, kolaydan zora seviye dağılımıyla eşleştirildi.` +
           (result.skippedModuleCount ? ` ${result.skippedModuleCount} modül okuma metni veya zorluk bilgisi eksik olduğu için atlandı.` : "")
       );
     } catch (synchronizeError) {
